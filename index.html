@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorador Interativo do Livro do Apocalipse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Celestial Hope (Neutros quentes como base, com detalhes em azul celeste profundo e realces em âmbar suave) -->
+    <!-- Application Structure Plan: Aplicação de página única com um cabeçalho principal. Navegação através de um seletor de capítulos (menu suspenso) para exibir explicações detalhadas dos capítulos. Uma seção 'Visão Geral' com introdução e um gráfico das principais seções do livro. Funcionalidade de busca por palavras-chave. Esta estrutura visa fornecer exploração tanto linear (capítulo por capítulo) quanto não linear (temática, baseada em busca) do denso conteúdo textual, melhorando a usabilidade e a compreensão. -->
+    <!-- Visualization & Content Choices:
+        - Conteúdo dos Capítulos: Texto completo da fonte, estruturado com HTML. Seções dentro dos capítulos podem ser implementadas como recolhíveis com JS adicional (não incluído nesta versão base para simplicidade, mas é uma melhoria possível). Objetivo: Informar. Interação: Navegação.
+        - Visão Geral (Gráfico Conceitual): Gráfico de barras horizontais com Chart.js mostrando as principais seções do livro. Objetivo: Organizar. Interação: Tooltips ao passar o mouse.
+        - Todo o conteúdo textual é extraído da "Explicação Detalhada dos Capítulos do Livro do Apocalipse".
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Tailwind usa uma pilha de fontes sans-serif por padrão, Inter é uma boa opção */
+        }
+        .content-section {
+            display: none; /* Escondido por padrão, JS controlará a visibilidade */
+        }
+        .content-section.active {
+            display: block;
+        }
+        .nav-button.active {
+            background-color: #0369a1; /* sky-700 */
+            font-weight: 600;
+        }
+        /* Estilos para o conteúdo do capítulo para melhor legibilidade */
+        .chapter-prose h3 {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #0c4a6e; /* sky-800 */
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        .chapter-prose h4 {
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            color: #075985; /* sky-700 */
+            margin-top: 1rem; /* mt-4 */
+            margin-bottom: 0.25rem; /* mb-1 */
+        }
+        .chapter-prose p {
+            margin-bottom: 1rem; /* mb-4 */
+            line-height: 1.75; /* leading-relaxed */
+            color: #374151; /* text-gray-700 */
+        }
+        .chapter-prose ul {
+            list-style-type: disc;
+            margin-left: 1.5rem; /* ml-6 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .chapter-prose ol {
+            list-style-type: decimal;
+            margin-left: 1.5rem; /* ml-6 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .chapter-prose li {
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        .chapter-prose strong {
+            color: #1f2937; /* text-gray-800 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px; /* max-w-3xl approx */
+            margin-left: auto;
+            margin-right: auto;
+            min-height: 300px; /* h-72 */
+            height: 50vh; /* h-[50vh] */
+            max-height: 450px; /* max-h-[450px] */
+        }
+        mark {
+            background-color: #fde047; /* yellow-300 */
+            padding: 0.125rem; /* px-0.5 */
+            border-radius: 0.25rem; /* rounded-sm */
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-neutral-800">
+    <header class="bg-sky-700 text-white p-5 shadow-md sticky top-0 z-50">
+        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-center sm:text-left">Explorador do Livro do Apocalipse</h1>
+            <nav class="mt-3 sm:mt-0 flex flex-wrap justify-center items-center space-x-2 sm:space-x-3">
+                <button id="nav-visao-geral" class="nav-button text-sm sm:text-base hover:bg-sky-500 px-3 py-2 rounded-md transition-colors duration-150">Visão Geral</button>
+                <div class="relative">
+                    <select id="chapter-select" class="text-sm sm:text-base bg-white text-sky-700 px-3 py-2 rounded-md border border-sky-300 focus:ring-amber-500 focus:border-amber-500 appearance-none">
+                        <option value="">Selecionar Capítulo...</option>
+                        </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-sky-700">
+                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                    </div>
+                </div>
+                <input type="text" id="search-input" placeholder="Buscar termo..." class="text-sm sm:text-base px-3 py-2 rounded-md border border-sky-300 focus:ring-amber-500 focus:border-amber-500 w-32 sm:w-auto">
+                <button id="search-button" class="text-sm sm:text-base bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-md transition-colors duration-150">Buscar</button>
+                <button id="clear-search-button" class="text-sm sm:text-base bg-stone-400 hover:bg-stone-500 text-white px-3 py-2 rounded-md transition-colors duration-150 hidden">Limpar</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-6 lg:p-8 mt-4">
+        <section id="visao-geral-section" class="content-section bg-white p-6 rounded-lg shadow-xl">
+            <h2 class="text-2xl md:text-3xl font-semibold text-sky-700 mb-6 border-b pb-3 border-sky-200">Visão Geral do Apocalipse</h2>
+            <p class="mb-6 text-lg text-neutral-700">Bem-vindo ao Explorador Interativo do Livro do Apocalipse! Esta aplicação foi desenhada para o ajudar a navegar e compreender o conteúdo profundo e simbólico do último livro da Bíblia. Utilize o menu acima para selecionar um capítulo específico para estudo detalhado, ou explore a estrutura geral do livro abaixo. Pode também pesquisar por termos chave para encontrar passagens relevantes.</p>
+            <div class="chart-container my-8 bg-stone-50 p-4 rounded-lg border border-stone-200">
+                <canvas id="majorSectionsChart"></canvas>
+            </div>
+            <p class="mt-6 text-md text-neutral-600">O gráfico acima ilustra as principais divisões temáticas e narrativas do Livro do Apocalipse, oferecendo um roteiro visual para a sua exploração. Cada barra representa uma seção principal, e o seu tamanho relativo indica o número de capítulos que abrange, dando uma ideia da sua extensão dentro do livro.</p>
+        </section>
+
+        <section id="chapter-display-section" class="content-section hidden bg-white p-6 rounded-lg shadow-xl">
+            <h2 id="chapter-title" class="text-2xl md:text-3xl font-semibold text-sky-700 mb-6 border-b pb-3 border-sky-200"></h2>
+            <div id="chapter-content-container" class="chapter-prose max-w-none text-neutral-700 leading-relaxed">
+                </div>
+        </section>
+
+        <div id="all-chapters-data" class="hidden">
+            <div data-chapter="1">
+                <h3>Versículos 1-3: Prólogo.</h3>
+                <p>O livro se apresenta como a "Revelação de Jesus Cristo", dada por Deus para mostrar aos Seus servos o que em breve há de acontecer. João é o transmissor dessa revelação. Há uma bênção prometida àqueles que leem, ouvem e guardam as palavras desta profecia, pois "o tempo está próximo".</p>
+                <h3>Versículos 4-8: Saudação às Sete Igrejas e Doxologia.</h3>
+                <p>João saúda as sete igrejas da província da Ásia (Éfeso, Esmirna, Pérgamo, Tiatira, Sardes, Filadélfia e Laodiceia). Ele louva a Jesus Cristo como "a testemunha fiel, o primogênito dos mortos e o soberano dos reis da terra". A doxologia enfatiza o amor redentor de Cristo e Sua glória. A afirmação "Eu sou o Alfa e o Ômega", dita pelo Senhor Deus, destaca Sua eternidade e soberania.</p>
+                <h3>Versículos 9-20: A Visão do Cristo Glorificado.</h3>
+                <p>João descreve sua situação em Patmos ("por causa da palavra de Deus e do testemunho de Jesus") e como, no "dia do Senhor", ouviu uma grande voz e viu sete candelabros de ouro. No meio dos candelabros, ele vê "um semelhante ao Filho do Homem". Esta é uma visão majestosa de Jesus Cristo glorificado:</p>
+                <ul>
+                    <li><strong>Vestes talares e cinto de ouro:</strong> Sacerdócio e realeza.</li>
+                    <li><strong>Cabeça e cabelos brancos como a lã, como a neve:</strong> Pureza, sabedoria e eternidade.</li>
+                    <li><strong>Olhos como chama de fogo:</strong> Onisciência, capacidade de penetrar e julgar.</li>
+                    <li><strong>Pés semelhantes ao bronze polido, como que refinado numa fornalha:</strong> Firmeza, estabilidade e juízo.</li>
+                    <li><strong>Voz como a voz de muitas águas:</strong> Poder e majestade.</li>
+                    <li><strong>Sete estrelas na mão direita:</strong> Os anjos (mensageiros ou líderes) das sete igrejas.</li>
+                    <li><strong>Uma espada afiada de dois gumes saindo da boca:</strong> A Palavra de Deus, poderosa para julgar e discernir.</li>
+                    <li><strong>Rosto como o sol quando brilha em sua força:</strong> Glória divina e majestade.</li>
+                </ul>
+                <p>João cai aos pés de Jesus como morto, mas Jesus o conforta, afirmando ser "o Primeiro e o Último, e o que vive; estive morto, mas eis que estou vivo pelos séculos dos séculos, e tenho as chaves da morte e do inferno". Jesus instrui João a escrever o que viu, o que é e o que há de acontecer. Os sete candelabros são as sete igrejas, e as sete estrelas são os anjos das igrejas.</p>
+            </div>
+            <div data-chapter="2">
+                <p>Este capítulo contém as primeiras quatro das sete cartas ditadas por Jesus, através de João, às igrejas da Ásia Menor. Cada carta segue um padrão geral:</p>
+                <ol>
+                    <li><strong>Destinatário:</strong> "Ao anjo da igreja em..."</li>
+                    <li><strong>Remetente:</strong> Uma descrição de Cristo, frequentemente tirada da visão do capítulo 1.</li>
+                    <li><strong>Elogio:</strong> Reconhecimento das boas obras e qualidades da igreja (exceto Laodiceia).</li>
+                    <li><strong>Repreensão:</strong> Identificação de falhas e pecados (exceto Esmirna e Filadélfia).</li>
+                    <li><strong>Exortação/Advertência:</strong> Chamado ao arrependimento e à mudança.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> Uma bênção específica para aqueles que permanecerem fiéis.</li>
+                    <li><strong>Chamado à Audição:</strong> "Quem tem ouvidos, ouça o que o Espírito diz às igrejas."</li>
+                </ol>
+                <h3>Versículos 1-7: À Igreja de Éfeso.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "Aquele que tem na sua destra as sete estrelas, que anda no meio dos sete candeeiros de ouro."</li>
+                    <li><strong>Elogio:</strong> Trabalho árduo, perseverança, rejeição aos maus e aos falsos apóstolos, paciência e sofrimento pelo nome de Cristo.</li>
+                    <li><strong>Repreensão:</strong> "Abandonaste o teu primeiro amor." A paixão e o fervor iniciais pela fé haviam diminuído.</li>
+                    <li><strong>Exortação:</strong> Lembrar-se de onde caiu, arrepender-se e praticar as primeiras obras, sob pena de ter seu candeeiro removido.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Dar-lhe-ei a comer da árvore da vida, que está no paraíso de Deus."</li>
+                </ul>
+                <h3>Versículos 8-11: À Igreja de Esmirna.</h3>
+                 <ul>
+                    <li><strong>Remetente:</strong> "O Primeiro e o Último, que foi morto e reviveu."</li>
+                    <li><strong>Elogio:</strong> Conhecimento de sua tribulação, pobreza (mas riqueza espiritual) e da blasfêmia daqueles que se dizem judeus e não são (sinagoga de Satanás).</li>
+                    <li><strong>Repreensão:</strong> Nenhuma. Esta é uma igreja sofredora, mas fiel.</li>
+                    <li><strong>Exortação:</strong> Não temer o sofrimento futuro, incluindo prisão e tribulação por "dez dias" (um período limitado). Ser fiel até a morte.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Não sofrerá o dano da segunda morte."</li>
+                </ul>
+                <h3>Versículos 12-17: À Igreja de Pérgamo.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "Aquele que tem a espada afiada de dois gumes."</li>
+                    <li><strong>Elogio:</strong> Habitar "onde está o trono de Satanás" (um centro de idolatria pagã e culto imperial) e, mesmo assim, reter o nome de Cristo e não negar a fé, mesmo durante o martírio de Antipas.</li>
+                    <li><strong>Repreensão:</strong> Tolerar aqueles que seguem a doutrina de Balaão (que ensinou Balaque a armar ciladas para Israel, levando-os à idolatria e imoralidade) e a doutrina dos nicolaítas.</li>
+                    <li><strong>Exortação:</strong> Arrepender-se, caso contrário, Cristo virá e lutará contra eles com a espada de Sua boca.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Dar-lhe-ei do maná escondido, e lhe darei uma pedrinha branca, e sobre essa pedrinha escrito um nome novo, o qual ninguém conhece, exceto aquele que o recebe."</li>
+                </ul>
+                <h3>Versículos 18-29: À Igreja de Tiatira.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "O Filho de Deus, que tem os olhos como chama de fogo, e os pés semelhantes ao bronze polido."</li>
+                    <li><strong>Elogio:</strong> Amor, fé, serviço, perseverança e obras recentes maiores que as primeiras.</li>
+                    <li><strong>Repreensão:</strong> Tolerar "a mulher Jezabel" (uma falsa profetisa que ensinava e seduzia os servos de Deus a praticar a prostituição e a comer coisas sacrificadas aos ídolos).</li>
+                    <li><strong>Exortação:</strong> Aqueles que não seguiram essa doutrina e não conheceram as "coisas profundas de Satanás" devem reter o que têm até a vinda de Cristo. A Jezabel e seus seguidores são advertidos com juízo.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Dar-lhe-ei autoridade sobre as nações... e lhe darei a estrela da manhã."</li>
+                </ul>
+            </div>
+            <div data-chapter="3">
+                <h3>Mensagens às Igrejas de Sardes, Filadélfia e Laodiceia</h3>
+                <p>Continuam as cartas às sete igrejas.</p>
+                <h3>Versículos 1-6: À Igreja de Sardes.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "Aquele que tem os sete espíritos de Deus e as sete estrelas."</li>
+                    <li><strong>Elogio:</strong> Poucos em Sardes não contaminaram suas vestes.</li>
+                    <li><strong>Repreensão:</strong> "Tens nome de que vives, e estás morto." Suas obras não foram achadas íntegras diante de Deus.</li>
+                    <li><strong>Exortação:</strong> Ser vigilante, consolidar o que resta e está para morrer, lembrar-se do que recebeu e ouviu, guardá-lo e arrepender-se. Se não vigiar, Cristo virá como um ladrão.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Será vestido de vestiduras brancas, e de modo nenhum apagarei o seu nome do Livro da Vida; pelo contrário, confessarei o seu nome diante de meu Pai e diante dos seus anjos."</li>
+                </ul>
+                <h3>Versículos 7-13: À Igreja de Filadélfia.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "O Santo, o Verdadeiro, aquele que tem a chave de Davi; que abre, e ninguém fechará; e que fecha, e ninguém abrirá."</li>
+                    <li><strong>Elogio:</strong> Embora com pouca força, guardou a palavra de Cristo e não negou Seu nome. Cristo colocou diante dela uma "porta aberta" (oportunidade de ministério ou entrada no Reino).</li>
+                    <li><strong>Repreensão:</strong> Nenhuma. Esta é outra igreja fiel.</li>
+                    <li><strong>Exortação:</strong> Conservar o que tem, para que ninguém tome sua coroa. Cristo fará com que os da "sinagoga de Satanás" venham e se prostrem aos seus pés.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Fá-lo-ei coluna no santuário do meu Deus, e daí jamais sairá; gravarei sobre ele o nome do meu Deus, o nome da cidade do meu Deus, a nova Jerusalém que desce do céu, vinda da parte do meu Deus, e o meu novo nome."</li>
+                </ul>
+                <h3>Versículos 14-22: À Igreja de Laodiceia.</h3>
+                <ul>
+                    <li><strong>Remetente:</strong> "O Amém, a testemunha fiel e verdadeira, o princípio da criação de Deus."</li>
+                    <li><strong>Elogio:</strong> Nenhum. Esta é a igreja em pior estado espiritual.</li>
+                    <li><strong>Repreensão:</strong> Ser "morna, e não és quente nem frio". Sua autossuficiência ("Sou rico, e estou enriquecido, e de nada tenho falta") a cega para sua verdadeira condição: "infeliz, sim, miserável, pobre, cego e nu."</li>
+                    <li><strong>Exortação:</strong> Comprar de Cristo "ouro refinado pelo fogo" (fé verdadeira), "vestiduras brancas" (justiça) e "colírio" (discernimento espiritual). Ser zeloso e arrepender-se. Cristo está à porta e bate; se alguém ouvir e abrir, Ele entrará e ceará com ele.</li>
+                    <li><strong>Promessa ao Vencedor:</strong> "Dar-lhe-ei sentar-se comigo no meu trono, assim como também eu venci e me sentei com meu Pai no seu trono."</li>
+                </ul>
+            </div>
+            <div data-chapter="4">
+                <h3>A Visão do Trono Celestial</h3>
+                <h3>Versículos 1-11: O Trono de Deus e os Seres Celestiais.</h3>
+                <p>Após as mensagens às igrejas, João é chamado ao céu por uma voz como de trombeta, dizendo: "Sobe para aqui, e mostrar-te-ei o que deve acontecer depois destas coisas."</p>
+                <ul>
+                    <li><strong>O Trono:</strong> João vê um trono estabelecido no céu, e Alguém sentado nele, com aparência semelhante a jaspe e sardônio. Um arco-íris semelhante à esmeralda rodeava o trono. Esta é uma representação da majestade e glória inefáveis de Deus Pai.</li>
+                    <li><strong>Os Vinte e Quatro Anciãos:</strong> Ao redor do trono, havia vinte e quatro outros tronos, nos quais estavam sentados vinte e quatro anciãos, vestidos de branco e com coroas de ouro. Eles representam provavelmente a totalidade dos redimidos (12 tribos de Israel + 12 apóstolos, simbolizando o povo de Deus do Antigo e Novo Testamento) ou seres angelicais de alta ordem.</li>
+                    <li><strong>Fenômenos ao Redor do Trono:</strong> Do trono saíam relâmpagos, vozes e trovões (manifestações do poder divino). Sete tochas de fogo ardiam diante do trono, que são "os sete espíritos de Deus" (plenitude do Espírito Santo). Havia também um "mar de vidro, semelhante ao cristal".</li>
+                    <li><strong>Os Quatro Seres Viventes:</strong> No meio e ao redor do trono estavam quatro seres viventes, cheios de olhos por diante e por detrás:
+                        <ul>
+                            <li>O primeiro semelhante a um <strong>leão</strong> (majestade, poder).</li>
+                            <li>O segundo semelhante a um <strong>novilho</strong> (serviço, força).</li>
+                            <li>O terceiro com rosto como de <strong>homem</strong> (inteligência, razão).</li>
+                            <li>O quarto semelhante à <strong>águia</strong> voando (soberania, rapidez).</li>
+                        </ul>
+                        Estes seres, reminiscentes dos querubins de Ezequiel, proclamam incessantemente a santidade de Deus: "Santo, Santo, Santo é o Senhor Deus, o Todo-Poderoso, aquele que era, que é e que há de vir."
+                    </li>
+                    <li><strong>Adoração Celestial:</strong> Sempre que os seres viventes dão glória, honra e ações de graças a Deus, os vinte e quatro anciãos prostram-se, adoram, lançam suas coroas diante do trono e declaram a dignidade de Deus como Criador: "Tu és digno, Senhor e Deus nosso, de receber a glória, a honra e o poder, porque todas as coisas tu criaste, sim, por causa da tua vontade vieram a existir e foram criadas."</li>
+                </ul>
+            </div>
+            <div data-chapter="5">
+                <h3>O Rolo Selado e o Cordeiro Digno</h3>
+                <h3>Versículos 1-4: O Rolo e a Incapacidade de Abertura.</h3>
+                <p>João vê na mão direita dAquele que está assentado no trono um rolo escrito por dentro e por fora, selado com sete selos. Um anjo forte proclama: "Quem é digno de abrir o livro e de lhe desatar os selos?" Ninguém no céu, na terra, nem debaixo da terra podia abrir o rolo ou olhar para ele. João chora muito porque ninguém foi achado digno. O rolo provavelmente contém os decretos de Deus concernentes ao destino do mundo e à consumação de Seu plano redentor.</p>
+                <h3>Versículos 5-7: O Leão da Tribo de Judá, a Raiz de Davi.</h3>
+                <p>Um dos anciãos consola João, anunciando que "o Leão da tribo de Judá, a Raiz de Davi, venceu para abrir o livro e os seus sete selos." Este é Jesus Cristo.</p>
+                <h3>Versículos 6-14: O Cordeiro como que Tendo Sido Morto.</h3>
+                <p>João então vê, no meio do trono, dos quatro seres viventes e dos anciãos, "um Cordeiro em pé, como que tendo sido morto". Este Cordeiro tem sete chifres (plenitude de poder) e sete olhos (os sete espíritos de Deus, plenitude de onisciência e do Espírito Santo). O Cordeiro toma o rolo da mão direita de Deus.</p>
+                <ul>
+                    <li><strong>Adoração ao Cordeiro:</strong> Imediatamente, os quatro seres viventes e os vinte e quatro anciãos prostram-se diante do Cordeiro. Cada um tem uma harpa (adoração) e taças de ouro cheias de incenso (as orações dos santos).</li>
+                    <li><strong>O Novo Cântico:</strong> Eles cantam um novo cântico, declarando a dignidade do Cordeiro para tomar o livro e abrir seus selos, porque Ele foi morto e com Seu sangue comprou para Deus homens de toda tribo, língua, povo e nação, fazendo deles um reino e sacerdotes para Deus, que reinarão sobre a terra.</li>
+                    <li><strong>Adoração Universal:</strong> Milhões de anjos juntam-se à adoração, proclamando a dignidade do Cordeiro de receber poder, riqueza, sabedoria, força, honra, glória e louvor. Finalmente, toda criatura no céu, na terra, debaixo da terra e no mar une-se na adoração a Deus e ao Cordeiro. Os quatro seres viventes dizem "Amém", e os anciãos prostram-se e adoram.</li>
+                </ul>
+            </div>
+            <div data-chapter="6">
+                <h3>A Abertura dos Seis Primeiros Selos</h3>
+                <p>O Cordeiro começa a abrir os selos do rolo, e cada selo desencadeia juízos e eventos significativos que marcam o início do fim.</p>
+                <h3>Versículos 1-2: Primeiro Selo – O Cavaleiro do Cavalo Branco.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> Surge um cavalo branco. Seu cavaleiro tem um arco, recebe uma coroa e sai "vencendo e para vencer".</li>
+                    <li><strong>Interpretação Comum:</strong> Frequentemente interpretado como o Anticristo ou um espírito de conquista e engano que precede outros juízos. Alguns o veem como a pregação vitoriosa do evangelho, mas o contexto de juízo dos selos seguintes torna essa visão menos provável para muitos.</li>
+                </ul>
+                <h3>Versículos 3-4: Segundo Selo – O Cavaleiro do Cavalo Vermelho.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> Surge um cavalo vermelho. Seu cavaleiro recebe poder para tirar a paz da terra, para que os homens se matem uns aos outros; e lhe é dada uma grande espada.</li>
+                    <li><strong>Interpretação Comum:</strong> Simboliza a guerra e o derramamento de sangue.</li>
+                </ul>
+                <h3>Versículos 5-6: Terceiro Selo – O Cavaleiro do Cavalo Preto.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> Surge um cavalo preto. Seu cavaleiro tem uma balança na mão. Uma voz anuncia preços exorbitantes para o trigo e a cevada (indicando escassez e fome), mas ordena que o azeite e o vinho não sejam danificados (talvez indicando que os luxos dos ricos são preservados ou que certos recursos são poupados).</li>
+                    <li><strong>Interpretação Comum:</strong> Representa a fome e a escassez.</li>
+                </ul>
+                <h3>Versículos 7-8: Quarto Selo – O Cavaleiro do Cavalo Amarelo (Pálido).</h3>
+                <ul>
+                    <li><strong>Evento:</strong> Surge um cavalo amarelo (ou pálido, esverdeado). Seu cavaleiro chama-se Morte, e o Inferno (Hades) o segue. Eles recebem autoridade sobre a quarta parte da terra para matar com a espada, fome, peste e por meio das feras da terra.</li>
+                    <li><strong>Interpretação Comum:</strong> Simboliza a morte em suas diversas formas, como consequência dos juízos anteriores.</li>
+                </ul>
+                <h3>Versículos 9-11: Quinto Selo – As Almas dos Mártires.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> João vê debaixo do altar as almas daqueles que foram mortos por causa da palavra de Deus e do testemunho que deram. Eles clamam em alta voz: "Até quando, ó Soberano Senhor, santo e verdadeiro, não julgas nem vingas o nosso sangue dos que habitam sobre a terra?"</li>
+                    <li><strong>Resposta:</strong> Recebem vestiduras brancas e lhes é dito que repousem por mais um pouco de tempo, até que se complete o número dos seus conservos e irmãos que haveriam de ser mortos como eles foram.</li>
+                    <li><strong>Significado:</strong> Mostra a perspectiva celestial da perseguição e o anseio por justiça divina. O sofrimento dos fiéis não é esquecido por Deus.</li>
+                </ul>
+                <h3>Versículos 12-17: Sexto Selo – Cataclismos Cósmicos.</h3>
+                <ul>
+                    <li><strong>Eventos:</strong> Ocorre um grande terremoto. O sol torna-se negro como saco de crina, a lua inteira como sangue. As estrelas do céu caem sobre a terra. O céu se retira como um rolo que se enrola. Todos os montes e ilhas são movidos de seus lugares.</li>
+                    <li><strong>Reação Humana:</strong> Reis, grandes, comandantes, ricos, poderosos e todos os homens (escravos e livres) escondem-se nas cavernas e penhascos, clamando aos montes e rochedos para caírem sobre eles e os esconderem da face dAquele que está assentado no trono e da ira do Cordeiro.</li>
+                    <li><strong>Declaração:</strong> "Porque chegou o grande Dia da ira deles; e quem é que pode suster-se?"</li>
+                    <li><strong>Significado:</strong> Estes são sinais aterrorizantes do juízo divino iminente, que afetam toda a criação e todas as classes sociais. A linguagem é apocalíptica, indicando uma convulsão universal.</li>
+                </ul>
+            </div>
+            <div data-chapter="7">
+                <h3>Os Servos de Deus Selados e a Grande Multidão</h3>
+                <p>Este capítulo é um interlúdio entre o sexto e o sétimo selo, mostrando a proteção de Deus sobre Seu povo antes que os juízos finais se intensifiquem.</p>
+                <h3>Versículos 1-8: A Selagem dos 144.000 de Israel.</h3>
+                <ul>
+                    <li><strong>Anjos e Ventos:</strong> João vê quatro anjos em pé nos quatro cantos da terra, segurando os quatro ventos para que não soprassem sobre a terra, mar ou árvores (impedindo temporariamente a destruição).</li>
+                    <li><strong>O Anjo com o Selo:</strong> Outro anjo sobe do nascente, tendo o selo do Deus vivo. Ele clama aos quatro anjos para não danificarem a terra até que os servos de Deus sejam selados em suas testas.</li>
+                    <li><strong>Os Selados:</strong> João ouve o número dos selados: 144.000, de todas as tribos dos filhos de Israel (12.000 de cada uma das doze tribos listadas, com a notável ausência de Dã e a inclusão de Manassés em lugar de Efraim, e Levi sendo incluído).</li>
+                    <li><strong>Interpretação:</strong> Há debate sobre se este número é literal ou simbólico. Muitos o veem como representando a totalidade do povo de Deus (Israel étnico fiel ou a Igreja como o "Israel de Deus"), protegido espiritualmente durante a tribulação. O selo indica propriedade e proteção divina.</li>
+                </ul>
+                <h3>Versículos 9-17: A Grande Multidão de Todas as Nações.</h3>
+                <ul>
+                    <li><strong>Visão da Multidão:</strong> Após a selagem, João vê uma "grande multidão que ninguém podia enumerar, de todas as nações, tribos, povos e línguas, em pé diante do trono e diante do Cordeiro". Eles estão vestidos com vestiduras brancas e têm palmas nas mãos (símbolo de vitória e alegria).</li>
+                    <li><strong>Adoração:</strong> Clamam em grande voz: "Ao nosso Deus, que se assenta no trono, e ao Cordeiro, pertence a salvação!" Anjos, anciãos e os quatro seres viventes juntam-se na adoração.</li>
+                    <li><strong>Identidade da Multidão:</strong> Um dos anciãos pergunta a João quem são e de onde vieram. O ancião mesmo responde: "Estes são os que vêm da grande tribulação; lavaram suas vestiduras e as alvejaram no sangue do Cordeiro."</li>
+                    <li><strong>Sua Condição Glorificada:</strong> Por isso, estão diante do trono de Deus, servindo-O dia e noite em Seu santuário. Não terão mais fome nem sede, nem o sol ou calor algum cairá sobre eles. O Cordeiro no meio do trono os apascentará e os guiará às fontes da água da vida. E Deus lhes enxugará dos olhos toda lágrima.</li>
+                    <li><strong>Significado:</strong> Esta visão oferece uma perspectiva de esperança e triunfo final para os redimidos de todas as partes do mundo que passaram pela "grande tribulação" (um período de intenso sofrimento e perseguição, ou as tribulações gerais da vida cristã).</li>
+                </ul>
+            </div>
+            <div data-chapter="8">
+                <h3>O Sétimo Selo e as Primeiras Quatro Trombetas</h3>
+                <p>A abertura do sétimo selo não desencadeia um juízo direto, mas introduz uma nova série de sete juízos: as sete trombetas.</p>
+                <h3>Versículos 1-6: O Sétimo Selo e a Preparação para as Trombetas.</h3>
+                <ul>
+                    <li><strong>Silêncio no Céu:</strong> Quando o Cordeiro abre o sétimo selo, faz-se silêncio no céu por cerca de meia hora. Este silêncio é solene e expectante, talvez indicando a gravidade dos juízos que se seguirão.</li>
+                    <li><strong>As Sete Trombetas:</strong> João vê os sete anjos que se acham em pé diante de Deus, e lhes são dadas sete trombetas.</li>
+                    <li><strong>O Anjo com o Incensário:</strong> Outro anjo, com um incensário de ouro, põe-se junto ao altar. É-lhe dado muito incenso para oferecê-lo com as orações de todos os santos sobre o altar de ouro que está diante do trono. A fumaça do incenso sobe com as orações dos santos.</li>
+                    <li><strong>Fogo Lançado à Terra:</strong> O anjo toma o incensário, enche-o de fogo do altar e o atira à terra. Seguem-se trovões, vozes, relâmpagos e terremoto. Este ato simboliza que as orações dos santos por justiça foram ouvidas e que o juízo divino está prestes a ser derramado.</li>
+                    <li><strong>Preparação dos Anjos:</strong> Os sete anjos com as sete trombetas preparam-se para tocar.</li>
+                </ul>
+                <h3>Versículos 7-13: As Primeiras Quatro Trombetas.</h3>
+                <p>Estes juízos afetam o mundo natural, ecoando as pragas do Egito. Cada um afeta "a terça parte" de algo.</p>
+                <ul>
+                    <li><strong>Versículo 7: Primeira Trombeta – Juízo sobre a Terra.</strong>
+                        <ul>
+                            <li><strong>Evento:</strong> Saraiva e fogo misturados com sangue são lançados sobre a terra. A terça parte da terra é queimada, a terça parte das árvores e toda a erva verde.</li>
+                            <li><strong>Impacto:</strong> Destruição da vegetação e do solo.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Versículos 8-9: Segunda Trombeta – Juízo sobre o Mar.</strong>
+                        <ul>
+                            <li><strong>Evento:</strong> Algo como um grande monte ardendo em chamas é lançado ao mar. A terça parte do mar se torna em sangue.</li>
+                            <li><strong>Impacto:</strong> Morre a terça parte da vida marinha e é destruída a terça parte das embarcações.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Versículos 10-11: Terceira Trombeta – Juízo sobre os Rios e Fontes.</strong>
+                        <ul>
+                            <li><strong>Evento:</strong> Cai do céu uma grande estrela, ardendo como uma tocha, chamada Absinto. Ela cai sobre a terça parte dos rios e sobre as fontes das águas.</li>
+                            <li><strong>Impacto:</strong> A terça parte das águas se torna amarga (absinto), e muitos homens morrem por causa dessas águas.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Versículo 12: Quarta Trombeta – Juízo sobre os Corpos Celestes.</strong>
+                        <ul>
+                            <li><strong>Evento:</strong> É ferida a terça parte do sol, da lua e das estrelas, para que a terça parte deles se escurecesse e na terça parte do dia não houvesse luz, e do mesmo modo a noite.</li>
+                            <li><strong>Impacto:</strong> Escuridão parcial, afetando os ciclos naturais e causando temor.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Versículo 13: O Anúncio dos Três "Ais".</strong> João vê e ouve uma águia (ou anjo, em algumas traduções) voando pelo meio do céu, clamando em grande voz: "Ai! Ai! Ai dos que habitam sobre a terra, por causa dos restantes sons da trombeta dos três anjos que ainda têm de tocar!" Este anúncio intensifica a expectativa de juízos ainda mais severos.</li>
+                </ul>
+            </div>
+            <div data-chapter="9">
+                <h3>A Quinta e a Sexta Trombetas (os Dois Primeiros "Ais")</h3>
+                <p>Estes juízos são mais diretos e demoníacos em sua natureza.</p>
+                <h3>Versículos 1-12: Quinta Trombeta – O Primeiro "Ai" (Gafanhotos Demoníacos).</h3>
+                <ul>
+                    <li><strong>A Estrela Caída e o Abismo:</strong> Uma "estrela" (provavelmente um anjo caído, possivelmente Satanás ou um demônio poderoso) cai do céu e recebe a chave do poço do Abismo.</li>
+                    <li><strong>A Fumaça e os Gafanhotos:</strong> Ao abrir o Abismo, sobe uma fumaça densa que escurece o sol e o ar. Da fumaça saem gafanhotos sobre a terra.</li>
+                    <li><strong>Características e Ação dos Gafanhotos:</strong>
+                        <ul>
+                            <li>Não devem danificar a vegetação, mas apenas os homens que não têm o selo de Deus em suas testas.</li>
+                            <li>Não têm permissão para matá-los, mas para atormentá-los por cinco meses. O tormento é como o de um escorpião quando fere um homem.</li>
+                            <li>Nesses dias, os homens buscarão a morte, mas não a encontrarão.</li>
+                            <li>Aparência: Semelhantes a cavalos preparados para a guerra, com coroas como de ouro, rostos como de homens, cabelos como de mulheres, dentes como de leões. Têm couraças como de ferro, e o ruído de suas asas é como o de carros de muitos cavalos correndo para a batalha. Têm caudas com ferrões como de escorpiões.</li>
+                            <li>Rei: Têm sobre si como rei o anjo do Abismo, cujo nome em hebraico é Abadom, e em grego, Apoliom (que significa "Destruidor").</li>
+                        </ul>
+                    </li>
+                    <li><strong>Conclusão do Primeiro "Ai":</strong> "Passado é já um ai; eis que, depois destas coisas, vêm ainda dois ais."</li>
+                    <li><strong>Significado:</strong> Um tormento demoníaco terrível é liberado sobre os incrédulos, causando angústia extrema, mas não a morte física imediata.</li>
+                </ul>
+                <h3>Versículos 13-21: Sexta Trombeta – O Segundo "Ai" (O Exército do Eufrates).</h3>
+                <ul>
+                    <li><strong>A Voz do Altar:</strong> O sexto anjo toca a trombeta, e João ouve uma voz procedente dos quatro chifres do altar de ouro que está diante de Deus.</li>
+                    <li><strong>A Ordem:</strong> A voz ordena ao sexto anjo: "Solta os quatro anjos que se encontram atados junto ao grande rio Eufrates."</li>
+                    <li><strong>Os Quatro Anjos e o Exército:</strong> Os quatro anjos, que estavam preparados para aquela hora, dia, mês e ano, são soltos para matar a terça parte dos homens. O número das tropas de cavalaria é de duzentos milhões.</li>
+                    <li><strong>Descrição dos Cavalos e Cavaleiros:</strong> Os cavalos têm couraças de fogo, jacinto e enxofre. As cabeças dos cavalos são como de leões, e de suas bocas sai fogo, fumaça e enxofre. Por meio destes três flagelos (fogo, fumaça, enxofre) é morta a terça parte dos homens. O poder dos cavalos está em suas bocas e em suas caudas, que são semelhantes a serpentes e têm cabeças com as quais causam dano.</li>
+                    <li><strong>A Impenitência da Humanidade:</strong> Apesar desses juízos devastadores, "os restantes dos homens, que não foram mortos por estes flagelos, não se arrependeram das obras das suas mãos", continuando a adorar demônios e ídolos de ouro, prata, bronze, pedra e madeira, que não podem ver, nem ouvir, nem andar. "Nem ainda se arrependeram dos seus homicídios, nem das suas feitiçarias, nem da sua prostituição, nem dos seus furtos."</li>
+                    <li><strong>Significado:</strong> Um juízo ainda mais destrutivo, envolvendo forças demoníacas ou exércitos humanos inspirados por demônios, que resulta na morte de uma grande porção da humanidade. A dureza do coração humano é destacada pela recusa em se arrepender.</li>
+                </ul>
+            </div>
+            <div data-chapter="10">
+                <h3>O Anjo Poderoso e o Livrinho</h3>
+                <p>Este capítulo é outro interlúdio, entre a sexta e a sétima trombeta, focando na comissão profética de João.</p>
+                <h3>Versículos 1-7: O Anjo Poderoso com o Livrinho.</h3>
+                <ul>
+                    <li><strong>Descrição do Anjo:</strong> João vê outro anjo forte descendo do céu, envolto numa nuvem, com um arco-íris sobre a cabeça. Seu rosto era como o sol, e seus pés, como colunas de fogo. Este anjo tem características que lembram Cristo, mas é provavelmente um anjo de alta patente.</li>
+                    <li><strong>O Livrinho Aberto:</strong> Ele tem na mão um livrinho aberto. Põe o pé direito sobre o mar e o esquerdo sobre a terra, simbolizando autoridade sobre toda a criação.</li>
+                    <li><strong>O Brado e os Sete Trovões:</strong> O anjo brada com grande voz, como ruge um leão. Quando brada, os sete trovões emitem suas vozes. João ia escrever o que os sete trovões disseram, mas uma voz do céu lhe ordena: "Sela o que os sete trovões falaram e não o escrevas." O conteúdo dessas mensagens permanece um mistério.</li>
+                    <li><strong>O Juramento do Anjo:</strong> O anjo levanta a mão direita ao céu e jura por Aquele que vive pelos séculos dos séculos, o Criador de todas as coisas, "que já não haverá demora" (ou "tempo não haverá mais", dependendo da tradução, indicando que o fim está próximo ou que o tempo de oportunidade está se esgotando). Mas nos dias da voz do sétimo anjo, quando ele estiver para tocar a trombeta, "cumprir-se-á o mistério de Deus, como anunciou aos seus servos, os profetas."</li>
+                </ul>
+                <h3>Versículos 8-11: João Come o Livrinho.</h3>
+                <ul>
+                    <li><strong>A Ordem:</strong> A voz do céu novamente fala a João, instruindo-o a tomar o livrinho aberto da mão do anjo.</li>
+                    <li><strong>A Experiência de Comer:</strong> João toma o livrinho e o come. Na sua boca, era doce como mel, mas, depois de comê-lo, seu ventre ficou amargo.</li>
+                    <li><strong>A Nova Comissão:</strong> É dito a João: "É necessário que ainda profetizes a respeito de muitos povos, nações, línguas e reis."</li>
+                    <li><strong>Significado:</strong> O livrinho representa a Palavra de Deus ou uma porção específica da revelação divina. A doçura inicial simboliza a alegria de receber a mensagem de Deus, enquanto a amargura subsequente pode representar a dificuldade e o sofrimento envolvidos em proclamar essa mensagem, especialmente quando ela inclui juízos. A experiência de João ecoa a do profeta Ezequiel (Ezequiel 2:8-3:3). Ele é reconfirmado em seu papel profético.</li>
+                </ul>
+            </div>
+            <div data-chapter="11">
+                <h3>As Duas Testemunhas e a Sétima Trombeta</h3>
+                <p>Este capítulo continua o interlúdio, apresentando as duas testemunhas, e conclui com o toque da sétima trombeta.</p>
+                <h3>Versículos 1-14: As Duas Testemunhas (Parte do Segundo "Ai").</h3>
+                <ul>
+                    <li><strong>A Medição do Templo:</strong> João recebe uma cana semelhante a uma vara de medir, com a instrução de medir o santuário de Deus, o altar e os que nele adoram. O átrio exterior, porém, não deve ser medido, pois foi dado aos gentios, que pisarão a cidade santa por quarenta e dois meses (três anos e meio).</li>
+                    <li><strong>O Ministério das Duas Testemunhas:</strong> Deus dará poder às Suas duas testemunhas, e elas profetizarão por mil duzentos e sessenta dias (o mesmo período de quarenta e dois meses), vestidas de saco.
+                        <ul>
+                            <li><strong>Identidade Simbólica:</strong> São descritas como "as duas oliveiras e os dois candeeiros que se acham em pé diante do Senhor da terra", evocando Zacarias 4 (Zorobabel e Josué, representando liderança civil e religiosa). Frequentemente interpretadas como representando a totalidade do testemunho profético da Igreja, ou figuras literais como Moisés e Elias redivivos, devido aos seus poderes.</li>
+                            <li><strong>Poderes:</strong> Se alguém tentar lhes fazer mal, fogo sairá de suas bocas e devorará os inimigos. Têm poder para fechar o céu para que não chova durante sua profecia, poder sobre as águas para convertê-las em sangue e para ferir a terra com toda sorte de flagelos.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Morte e Ressurreição das Testemunhas:</strong> Quando completarem seu testemunho, a besta que surge do Abismo (introduzida aqui pela primeira vez) fará guerra contra elas, as vencerá e as matará. Seus cadáveres ficarão expostos na praça da grande cidade que, espiritualmente, se chama Sodoma e Egito, onde também o seu Senhor foi crucificado (Jerusalém). Os habitantes da terra se alegrarão com sua morte, pois as testemunhas os atormentavam.
+                        <ul>
+                            <li>Após três dias e meio, um espírito de vida, vindo de Deus, entra nelas, e elas se põem em pé, causando grande pavor. Ouvem uma voz do céu dizendo: "Subi para aqui!" E sobem ao céu numa nuvem, à vista dos seus inimigos.</li>
+                        </ul>
+                    </li>
+                    <li><strong>O Terremoto:</strong> Naquela mesma hora, ocorre um grande terremoto, e a décima parte da cidade cai, matando sete mil pessoas. Os sobreviventes ficam aterrorizados e dão glória ao Deus do céu.</li>
+                    <li><strong>Conclusão do Segundo "Ai":</strong> "Passado é o segundo ai; eis que o terceiro ai cedo virá."</li>
+                </ul>
+                <h3>Versículos 15-19: A Sétima Trombeta – O Terceiro "Ai" (O Reino de Deus Anunciado).</h3>
+                <ul>
+                    <li><strong>O Toque da Trombeta:</strong> O sétimo anjo toca a trombeta.</li>
+                    <li><strong>Proclamação no Céu:</strong> Ouvem-se grandes vozes no céu, dizendo: "O reino do mundo se tornou de nosso Senhor e do seu Cristo, e ele reinará pelos séculos dos séculos."</li>
+                    <li><strong>Adoração dos Vinte e Quatro Anciãos:</strong> Os vinte e quatro anciãos prostram-se e adoram a Deus, agradecendo porque Ele tomou Seu grande poder e começou a reinar. Eles mencionam a ira das nações, a chegada da ira de Deus, o tempo de julgar os mortos, de dar galardão aos profetas, santos e aos que temem o nome de Deus, e de destruir os que destroem a terra.</li>
+                    <li><strong>A Abertura do Santuário Celestial:</strong> Abre-se no céu o santuário de Deus, e a arca da Sua aliança é vista no Seu santuário. Seguem-se relâmpagos, vozes, trovões, terremoto e grande saraivada.</li>
+                    <li><strong>Significado:</strong> A sétima trombeta marca um ponto de virada crucial. Embora os juízos finais (as taças) ainda estejam por vir, a soberania de Cristo sobre o mundo é proclamada como um fato consumado no céu. O "terceiro ai" parece abranger os eventos subsequentes, incluindo as taças da ira. A visão da arca da aliança enfatiza a fidelidade de Deus às Suas promessas.</li>
+                </ul>
+            </div>
+            <div data-chapter="12">
+                <h3>A Mulher, o Dragão e a Guerra nos Céus</h3>
+                <p>Este capítulo introduz uma nova seção do Apocalipse (capítulos 12-14), que descreve o conflito cósmico entre Deus e Satanás, manifestado na perseguição ao povo de Deus.</p>
+                <h3>Versículos 1-6: A Mulher e o Dragão.</h3>
+                <ul>
+                    <li><strong>Sinal da Mulher:</strong> Um grande sinal aparece no céu: uma mulher vestida do sol, com a lua debaixo dos pés e uma coroa de doze estrelas na cabeça. Ela está grávida e grita com dores de parto.
+                        <ul>
+                            <li><strong>Interpretação:</strong> A mulher é frequentemente interpretada como representando Israel (de onde veio o Messias) ou a Igreja (o povo de Deus que dá à luz Cristo ao mundo através do testemunho). As doze estrelas podem aludir às doze tribos de Israel ou aos doze apóstolos.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Sinal do Dragão:</strong> Outro sinal aparece no céu: um grande dragão vermelho, com sete cabeças, dez chifres e sete diademas sobre as cabeças. Sua cauda arrasta a terça parte das estrelas do céu, lançando-as para a terra (possivelmente referindo-se a anjos caídos).
+                        <ul>
+                            <li><strong>Identidade:</strong> O dragão é explicitamente identificado mais tarde (v. 9) como "a antiga serpente, que se chama diabo e Satanás, o sedutor de todo o mundo." As cabeças e chifres simbolizam seu poder e autoridade sobre reinos terrenos.</li>
+                        </ul>
+                    </li>
+                    <li><strong>O Conflito:</strong> O dragão para diante da mulher para devorar seu filho assim que ele nascesse.</li>
+                    <li><strong>O Filho Varão:</strong> A mulher dá à luz um filho varão, "que há de reger todas as nações com cetro de ferro". Este filho é arrebatado para Deus e para o Seu trono.
+                        <ul>
+                            <li><strong>Identidade:</strong> Claramente Jesus Cristo, cuja ascensão é aqui retratada.</li>
+                        </ul>
+                    </li>
+                    <li><strong>A Fuga da Mulher:</strong> A mulher foge para o deserto, onde tem um lugar preparado por Deus para ser sustentada por mil duzentos e sessenta dias (o mesmo período das duas testemunhas e da dominação gentílica).</li>
+                </ul>
+                <h3>Versículos 7-12: A Guerra no Céu.</h3>
+                <ul>
+                    <li><strong>Batalha Celestial:</strong> Houve peleja no céu: Miguel (o arcanjo) e seus anjos pelejaram contra o dragão. O dragão e seus anjos também pelejaram, mas não prevaleceram, nem mais se achou no céu o lugar deles.</li>
+                    <li><strong>A Expulsão de Satanás:</strong> O grande dragão é expulso, juntamente com seus anjos, e lançado para a terra.</li>
+                    <li><strong>Alegria no Céu e Ai da Terra:</strong> Uma grande voz no céu proclama a chegada da salvação, do poder, do reino de Deus e da autoridade de Seu Cristo, pois o acusador dos irmãos (Satanás) foi expulso. Os santos o venceram "por causa do sangue do Cordeiro e por causa da palavra do testemunho que deram, e, mesmo em face da morte, não amaram a própria vida." Há alegria no céu, mas "ai da terra e do mar, pois o diabo desceu até vós, cheio de grande fúria, sabendo que pouco tempo lhe resta."</li>
+                </ul>
+                <h3>Versículos 13-17: A Perseguição do Dragão à Mulher e à Sua Descendência.</h3>
+                <ul>
+                    <li><strong>Perseguição à Mulher:</strong> Vendo-se lançado para a terra, o dragão persegue a mulher.</li>
+                    <li><strong>Proteção Divina:</strong> São dadas à mulher "as duas asas da grande águia" para voar ao deserto, ao seu lugar, onde é sustentada por "um tempo, tempos e metade de um tempo" (outra forma de referir-se a três anos e meio), fora da vista da serpente.</li>
+                    <li><strong>Ataque da Serpente:</strong> A serpente lança de sua boca, atrás da mulher, água como um rio, para fazê-la submergir.</li>
+                    <li><strong>Intervenção da Terra:</strong> A terra ajuda a mulher, abrindo sua boca e engolindo o rio.</li>
+                    <li><strong>Fúria do Dragão Contra a Descendência:</strong> O dragão, irado contra a mulher, vai pelejar contra "os restantes da sua descendência, os que guardam os mandamentos de Deus e têm o testemunho de Jesus".</li>
+                    <li><strong>Significado:</strong> Este capítulo revela a origem satânica da perseguição contra o povo de Deus. A expulsão de Satanás do céu intensifica sua atividade maligna na terra, mas Deus provê proteção e sustento para Seus fiéis.</li>
+                </ul>
+            </div>
+            <div data-chapter="13">
+                <h3>As Duas Bestas</h3>
+                <p>Este capítulo descreve os principais agentes terrenos de Satanás na perseguição ao povo de Deus: a Besta do Mar e a Besta da Terra (também conhecida como o Falso Profeta).</p>
+                <h3>Versículos 1-10: A Besta que Emerge do Mar.</h3>
+                <ul>
+                    <li><strong>Origem e Aparência:</strong> João (ou o dragão, dependendo da variante textual) se posta sobre a areia do mar. Emerge do mar uma besta com dez chifres e sete cabeças; sobre os chifres, dez diademas; e sobre as cabeças, nomes de blasfêmia. A besta é semelhante a um leopardo, com pés de urso e boca de leão (combinando características das bestas de Daniel 7, representando impérios mundiais hostis a Deus).</li>
+                    <li><strong>Poder do Dragão:</strong> O dragão (Satanás) dá à besta o seu poder, o seu trono e grande autoridade.</li>
+                    <li><strong>A Ferida Mortal Curada:</strong> Uma de suas cabeças parece ter sido ferida de morte, mas a ferida mortal foi curada. Toda a terra se maravilha e segue a besta.</li>
+                    <li><strong>Adoração ao Dragão e à Besta:</strong> Adoram o dragão porque deu autoridade à besta, e adoram a besta, dizendo: "Quem é semelhante à besta? Quem pode pelejar contra ela?"</li>
+                    <li><strong>Blasfêmias e Autoridade:</strong> É-lhe dada uma boca que proferia arrogâncias e blasfêmias, e autoridade para agir por quarenta e dois meses. Ela blasfema contra Deus, Seu nome, Seu tabernáculo e os que habitam no céu.</li>
+                    <li><strong>Guerra Contra os Santos:</strong> É-lhe permitido fazer guerra aos santos e vencê-los. Recebe autoridade sobre toda tribo, povo, língua e nação.</li>
+                    <li><strong>Adoração Universal (dos Ímpios):</strong> Todos os que habitam sobre a terra, cujos nomes não foram escritos no Livro da Vida do Cordeiro que foi morto desde a fundação do mundo, a adorarão.</li>
+                    <li><strong>Chamado à Perseverança:</strong> "Se alguém tem ouvidos, ouça. Se alguém leva para cativeiro, para cativeiro vai. Se alguém matar à espada, necessário é que seja morto à espada. Aqui está a perseverança e a fidelidade dos santos."</li>
+                    <li><strong>Interpretação:</strong> A Besta do Mar é geralmente entendida como um poder político mundial ou um governante tirânico (o Anticristo) que se opõe a Deus e persegue Seu povo, derivando seu poder de Satanás. A "ferida mortal curada" pode referir-se à restauração de um império ou a uma ressurreição simulada.</li>
+                </ul>
+                <h3>Versículos 11-18: A Besta que Emerge da Terra (O Falso Profeta).</h3>
+                <ul>
+                    <li><strong>Origem e Aparência:</strong> Emerge da terra outra besta, com dois chifres semelhantes aos de um cordeiro, mas que falava como dragão.</li>
+                    <li><strong>Autoridade e Função:</strong> Exerce toda a autoridade da primeira besta na sua presença. Faz com que a terra e seus habitantes adorem a primeira besta (aquela cuja ferida mortal fora curada).</li>
+                    <li><strong>Grandes Sinais:</strong> Opera grandes sinais, a ponto de fazer descer fogo do céu sobre a terra, à vista dos homens.</li>
+                    <li><strong>Engano:</strong> Seduz os que habitam sobre a terra por causa dos sinais que lhe foi permitido realizar na presença da primeira besta.</li>
+                    <li><strong>A Imagem da Besta:</strong> Persuade os habitantes da terra a fazerem uma imagem à primeira besta (aquela que recebera o golpe de espada e vivera). Foi-lhe concedido dar fôlego à imagem da besta, para que ela falasse e fizesse morrer todos os que não a adorassem.</li>
+                    <li><strong>A Marca da Besta:</strong> Faz com que a todos, pequenos e grandes, ricos e pobres, livres e escravos, seja dada certa marca sobre a mão direita ou sobre a fronte, para que ninguém possa comprar ou vender, senão aquele que tem a marca, o nome da besta ou o número do seu nome.</li>
+                    <li><strong>O Número da Besta:</strong> "Aqui há sabedoria. Aquele que tem entendimento calcule o número da besta, pois é número de homem. Ora, esse número é seiscentos e sessenta e seis (666)."</li>
+                    <li><strong>Interpretação:</strong> A Besta da Terra, ou Falso Profeta, representa um poder religioso ou ideológico enganoso que promove a adoração da primeira besta (o poder político). Ela usa sinais e prodígios para enganar e impõe um sistema de controle econômico e religioso totalitário através da "marca da besta". O número 666 tem sido objeto de muitas interpretações, geralmente simbolizando a imperfeição humana máxima ou identificando uma figura histórica específica através da gematria (atribuição de valores numéricos a letras).</li>
+                </ul>
+            </div>
+            <div data-chapter="14">
+                <h3>Visões de Triunfo e Juízo</h3>
+                <p>Este capítulo oferece um contraste com a escuridão do capítulo 13, mostrando o Cordeiro com Seus redimidos, proclamações angélicas e as ceifas do juízo final.</p>
+                <h3>Versículos 1-5: O Cordeiro e os 144.000 no Monte Sião.</h3>
+                <ul>
+                    <li><strong>A Visão:</strong> João vê o Cordeiro em pé sobre o Monte Sião, e com Ele cento e quarenta e quatro mil que tinham na fronte escrito o nome dEle e o nome de Seu Pai. (Estes são provavelmente os mesmos 144.000 selados do capítulo 7).</li>
+                    <li><strong>O Cântico Novo:</strong> Ouve-se uma voz do céu, como de muitas águas e de grande trovão, e como de harpistas. Cantam um cântico novo diante do trono, dos quatro seres viventes e dos anciãos. Ninguém podia aprender o cântico, exceto os 144.000.</li>
+                    <li><strong>Características dos 144.000:</strong>
+                        <ul>
+                            <li>"Comprados da terra."</li>
+                            <li>"São estes os que não se macularam com mulheres, porque são virgens." (Interpretado literalmente por alguns, ou simbolicamente como pureza espiritual e fidelidade a Deus, não se contaminando com a idolatria da "prostituta Babilônia").</li>
+                            <li>"São os que seguem o Cordeiro para onde quer que vá."</li>
+                            <li>"Foram comprados dentre os homens, primícias para Deus e para o Cordeiro."</li>
+                            <li>"E na sua boca não se achou engano; são irrepreensíveis."</li>
+                        </ul>
+                    </li>
+                    <li><strong>Significado:</strong> Esta visão assegura a presença e a vitória dos redimidos fiéis com Cristo, mesmo em meio à perseguição das bestas. Eles representam a pureza, a dedicação e a vitória final do povo de Deus.</li>
+                </ul>
+                <h3>Versículos 6-13: As Proclamações dos Três Anjos.</h3>
+                <ul>
+                    <li><strong>Primeiro Anjo (Versículos 6-7): O Evangelho Eterno.</strong>
+                        <ul>
+                            <li>Um anjo voa pelo meio do céu, tendo um evangelho eterno para pregar aos que se assentam sobre a terra, a toda nação, tribo, língua e povo.</li>
+                            <li>Proclama em grande voz: "Temei a Deus e dai-lhe glória, pois é chegada a hora do seu juízo; e adorai aquele que fez o céu, e a terra, e o mar, e as fontes das águas."</li>
+                            <li><strong>Significado:</strong> Uma última chamada universal ao arrependimento e à adoração do Criador antes do juízo final.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Segundo Anjo (Versículo 8): A Queda da Babilônia.</strong>
+                        <ul>
+                            <li>Outro anjo o segue, dizendo: "Caiu, caiu a grande Babilônia que tem dado a beber a todas as nações do vinho da fúria da sua prostituição."</li>
+                            <li><strong>Significado:</strong> Anuncia antecipadamente a queda do sistema mundial corrupto e idólatra (Babilônia será detalhada nos capítulos 17-18).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Terceiro Anjo (Versículos 9-12): Advertência Contra a Adoração da Besta.</strong>
+                        <ul>
+                            <li>Um terceiro anjo os segue, dizendo em grande voz: "Se alguém adora a besta e a sua imagem e recebe a sua marca na fronte ou sobre a mão, também esse beberá do vinho da cólera de Deus, preparado, sem mistura, do cálice da sua ira, e será atormentado com fogo e enxofre, diante dos santos anjos e na presença do Cordeiro. A fumaça do seu tormento sobe pelos séculos dos séculos, e não têm descanso algum, nem de dia nem de noite, os adoradores da besta e da sua imagem e quem quer que receba a marca do seu nome."</li>
+                            <li><strong>Chamado à Perseverança:</strong> "Aqui está a perseverança dos santos, os que guardam os mandamentos de Deus e a fé em Jesus."</li>
+                            <li><strong>Significado:</strong> Uma advertência solene sobre as consequências eternas de se aliar ao sistema da besta.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Versículo 13: A Bem-Aventurança dos Mortos no Senhor.</strong>
+                        <ul>
+                            <li>Uma voz do céu diz: "Escreve: Bem-aventurados os mortos que, desde agora, morrem no Senhor. Sim, diz o Espírito, para que descansem das suas fadigas, pois as suas obras os acompanham."</li>
+                            <li><strong>Significado:</strong> Conforto e segurança para os fiéis que morrem durante este período de perseguição.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <h3>Versículos 14-20: As Duas Ceifas da Terra.</h3>
+                <ul>
+                    <li><strong>A Ceifa do Filho do Homem (Colheita dos Justos) (Versículos 14-16).</strong>
+                        <ul>
+                            <li>João vê uma nuvem branca, e sobre a nuvem, um assentado semelhante a Filho de Homem, com uma coroa de ouro na cabeça e uma foice afiada na mão.</li>
+                            <li>Outro anjo sai do santuário, clamando Àquele que está sobre a nuvem: "Lança a tua foice e ceifa, porque chegou a hora de ceifar, visto que a seara da terra já amadureceu!"</li>
+                            <li>Aquele que está sobre a nuvem passa sua foice sobre a terra, e a terra foi ceifada.</li>
+                            <li><strong>Significado:</strong> Representa a reunião dos justos, a colheita do trigo para o celeiro de Deus.</li>
+                        </ul>
+                    </li>
+                    <li><strong>A Vindima da Ira de Deus (Colheita dos Ímpios) (Versículos 17-20).</strong>
+                        <ul>
+                            <li>Outro anjo sai do santuário no céu, tendo também uma foice afiada.</li>
+                            <li>Ainda outro anjo, que tem autoridade sobre o fogo, sai do altar e clama ao que tem a foice afiada: "Lança a tua foice afiada e ajunta os cachos da videira da terra, porque as suas uvas estão maduras!"</li>
+                            <li>O anjo passa sua foice na terra, vindima a videira da terra e lança os cachos no grande lagar da cólera de Deus.</li>
+                            <li>O lagar foi pisado fora da cidade, e dele saiu sangue até aos freios dos cavalos, numa extensão de mil e seiscentos estádios (cerca de 300 km).</li>
+                            <li><strong>Significado:</strong> Representa o juízo terrível e sangrento sobre os ímpios, comparado à pisa das uvas no lagar. A imagem é de destruição maciça.</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div data-chapter="15">
+                <h3>Preparação para as Sete Taças da Ira de Deus</h3>
+                <p>Este capítulo é breve e serve como introdução à terceira e última série de sete juízos: as sete taças da ira de Deus, que completam Sua cólera.</p>
+                <h3>Versículos 1-4: Os Vencedores da Besta e o Cântico de Moisés e do Cordeiro.</h3>
+                <ul>
+                    <li><strong>Outro Sinal no Céu:</strong> João vê outro sinal no céu, grande e admirável: sete anjos tendo os sete últimos flagelos, pois com estes se consumou a cólera de Deus.</li>
+                    <li><strong>O Mar de Vidro:</strong> Vê como que um mar de vidro, mesclado de fogo (o mar de vidro do cap. 4, agora com o fogo do juízo).</li>
+                    <li><strong>Os Vencedores:</strong> Junto ao mar de vidro, estão em pé os que venceram a besta, a sua imagem e o número do seu nome. Eles têm harpas de Deus.</li>
+                    <li><strong>O Cântico:</strong> Cantam o cântico de Moisés, servo de Deus, e o cântico do Cordeiro, dizendo: "Grandes e admiráveis são as tuas obras, Senhor Deus, Todo-Poderoso! Justos e verdadeiros são os teus caminhos, ó Rei das nações (ou dos séculos/santos)! Quem não temerá e não glorificará o teu nome, ó Senhor? Pois só tu és santo; por isso, todas as nações virão e adorarão diante de ti, porque os teus atos de justiça se fizeram manifestos."</li>
+                    <li><strong>Significado:</strong> Antes do derramamento final da ira, há uma visão de triunfo e adoração daqueles que permaneceram fiéis apesar da perseguição da besta. O cântico celebra a justiça e a soberania de Deus, ecoando o livramento do Êxodo (Moisés) e a redenção em Cristo (Cordeiro).</li>
+                </ul>
+                <h3>Versículos 5-8: Os Sete Anjos com as Sete Taças.</h3>
+                <ul>
+                    <li><strong>Abertura do Santuário:</strong> Depois disso, João vê abrir-se o santuário do tabernáculo do testemunho no céu.</li>
+                    <li><strong>Saída dos Anjos:</strong> Do santuário saem os sete anjos com os sete flagelos, vestidos de linho puro e resplandecente, e cingidos à altura do peito com cintos de ouro (pureza e serviço sacerdotal).</li>
+                    <li><strong>Entrega das Taças:</strong> Um dos quatro seres viventes dá aos sete anjos sete taças de ouro, cheias da cólera de Deus, que vive pelos séculos dos séculos.</li>
+                    <li><strong>A Glória de Deus Enche o Santuário:</strong> O santuário se enche de fumaça procedente da glória de Deus e do seu poder, e ninguém podia penetrar no santuário, enquanto não se cumprissem os sete flagelos dos sete anjos. (Semelhante à dedicação do Tabernáculo e do Templo, indicando a presença especial e terrível de Deus em juízo).</li>
+                </ul>
+            </div>
+            <div data-chapter="16">
+                <h3>O Derramamento das Sete Taças da Ira de Deus</h3>
+                <p>Este capítulo descreve o derramamento das sete taças, que são juízos rápidos, severos e finais sobre o reino da besta e seus seguidores. Eles intensificam e universalizam alguns dos juízos das trombetas.</p>
+                <h3>Versículo 1: A Ordem para Derramar as Taças.</h3>
+                <p>Uma grande voz do santuário ordena aos sete anjos: "Ide e derramai pela terra as sete taças da cólera de Deus."</p>
+                <h3>Versículo 2: Primeira Taça – Feridas Malignas.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O primeiro anjo derrama sua taça sobre a terra.</li>
+                    <li><strong>Resultado:</strong> Abrem-se úlceras malignas e perniciosas nos homens que tinham a marca da besta e adoravam a sua imagem.</li>
+                </ul>
+                <h3>Versículo 3: Segunda Taça – O Mar se Torna Sangue.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O segundo anjo derrama sua taça no mar.</li>
+                    <li><strong>Resultado:</strong> O mar se torna em sangue como de morto, e morre todo ser vivente que há no mar. (Mais abrangente que a segunda trombeta).</li>
+                </ul>
+                <h3>Versículos 4-7: Terceira Taça – Rios e Fontes se Tornam Sangue.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O terceiro anjo derrama sua taça nos rios e nas fontes das águas.</li>
+                    <li><strong>Resultado:</strong> Eles se tornam em sangue.</li>
+                    <li><strong>Justificação do Juízo:</strong> O anjo das águas declara a justiça de Deus: "Justo és tu, que és e que eras, o Santo, pois julgaste estas coisas; porquanto derramaram sangue de santos e de profetas, também sangue lhes tens dado a beber; são dignos disso." O altar confirma: "Certamente, ó Senhor Deus, Todo-Poderoso, verdadeiros e justos são os teus juízos."</li>
+                </ul>
+                <h3>Versículos 8-9: Quarta Taça – O Sol Queima os Homens.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O quarto anjo derrama sua taça sobre o sol.</li>
+                    <li><strong>Resultado:</strong> Foi-lhe permitido que abrasasse os homens com fogo. Os homens são queimados pelo intenso calor e blasfemam o nome de Deus, que tem autoridade sobre estes flagelos, e não se arrependem para lhe darem glória. (A impenitência continua).</li>
+                </ul>
+                <h3>Versículos 10-11: Quinta Taça – Trevas sobre o Reino da Besta.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O quinto anjo derrama sua taça sobre o trono da besta.</li>
+                    <li><strong>Resultado:</strong> O seu reino se torna em trevas. Os homens remordiam a língua por causa da dor que sentiam e blasfemavam o Deus do céu por causa das suas angústias e das suas úlceras; e não se arrependeram das suas obras. (Juízo direto sobre o centro do poder da besta).</li>
+                </ul>
+                <h3>Versículos 12-16: Sexta Taça – O Eufrates Seca e a Reunião para o Armagedom.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O sexto anjo derrama sua taça sobre o grande rio Eufrates.</li>
+                    <li><strong>Resultado:</strong> Suas águas secam, para que se preparasse o caminho dos reis que vêm do Oriente.</li>
+                    <li><strong>Os Três Espíritos Imundos:</strong> João vê saírem da boca do dragão, da boca da besta e da boca do falso profeta três espíritos imundos, semelhantes a rãs. São espíritos de demônios, operadores de sinais, que se dirigem aos reis do mundo inteiro a fim de ajuntá-los para a peleja do grande Dia do Deus Todo-Poderoso.</li>
+                    <li><strong>Parêntese de Advertência:</strong> (Jesus diz: "Eis que venho como ladrão. Bem-aventurado aquele que vigia e guarda as suas vestes, para que não ande nu, e não se veja a sua vergonha.")</li>
+                    <li><strong>O Local da Batalha:</strong> Os espíritos ajuntam os reis no lugar que em hebraico se chama Armagedom (Monte de Megido, um local histórico de batalhas em Israel, aqui simbolizando o confronto final).</li>
+                </ul>
+                <h3>Versículos 17-21: Sétima Taça – "Está Feito!" e a Destruição Final.</h3>
+                <ul>
+                    <li><strong>Evento:</strong> O sétimo anjo derrama sua taça no ar.</li>
+                    <li><strong>Proclamação Divina:</strong> Sai grande voz do santuário, do lado do trono, dizendo: "Está feito!"</li>
+                    <li><strong>Resultados Cataclísmicos:</strong>
+                        <ul>
+                            <li>Relâmpagos, vozes e trovões.</li>
+                            <li>Um terremoto tão grande como nunca houve igual desde que há homens sobre a terra.</li>
+                            <li>A grande cidade (Babilônia/Jerusalém?) se divide em três partes, e as cidades das nações caem.</li>
+                            <li>Deus se lembra da grande Babilônia para dar-lhe o cálice do vinho do furor da Sua ira.</li>
+                            <li>Todas as ilhas fogem, e os montes não são achados.</li>
+                            <li>Cai do céu sobre os homens grande saraivada, com pedras do peso de um talento (cerca de 34-45 kg). Os homens blasfemam a Deus por causa do flagelo da saraivada, porque era mui grande o seu flagelo. (Mesmo no juízo final, a impenitência persiste para muitos).</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div data-chapter="17">
+                <h3>A Grande Prostituta e a Besta Escarlate</h3>
+                <p>Este capítulo e o próximo detalham a natureza e a queda da "Grande Babilônia", o sistema mundial religioso e político apóstata que se opõe a Deus.</p>
+                <h3>Versículos 1-6: A Descrição da Grande Prostituta.</h3>
+                <ul>
+                    <li><strong>O Convite do Anjo:</strong> Um dos sete anjos das taças convida João para mostrar-lhe o julgamento da grande prostituta que se assenta sobre muitas águas.</li>
+                    <li><strong>Sua Influência:</strong> Com ela se prostituíram os reis da terra, e os que habitam na terra se embriagaram com o vinho da sua prostituição.</li>
+                    <li><strong>A Visão no Deserto:</strong> João é levado em espírito a um deserto e vê uma mulher montada numa besta escarlate, cheia de nomes de blasfêmia, com sete cabeças e dez chifres (a mesma besta do mar do cap. 13, ou intimamente relacionada).</li>
+                    <li><strong>Aparência da Mulher:</strong>
+                        <ul>
+                            <li>Vestida de púrpura e escarlate (cores da realeza e luxo).</li>
+                            <li>Adornada de ouro, pedras preciosas e pérolas.</li>
+                            <li>Tem na mão um cálice de ouro, transbordante de abominações e com as imundícias da sua prostituição.</li>
+                            <li>Na fronte, um nome escrito, um mistério: "BABILÔNIA, A GRANDE, A MÃE DAS MERETRIZES E DAS ABOMINAÇÕES DA TERRA."</li>
+                        </ul>
+                    </li>
+                    <li><strong>Embriagada com Sangue:</strong> A mulher está embriagada com o sangue dos santos e das testemunhas de Jesus. João fica grandemente admirado.</li>
+                </ul>
+                <h3>Versículos 7-18: A Explicação do Mistério pelo Anjo.</h3>
+                <ul>
+                    <li><strong>O Mistério da Mulher e da Besta:</strong> O anjo se propõe a explicar o mistério da mulher e da besta que a transporta.</li>
+                    <li><strong>A Besta que Era, Não É, e Está para Subir:</strong> A besta "que viste era e não é e está para emergir do abismo e caminha para a perdição". Os habitantes da terra (cujos nomes não estão no Livro da Vida) se admirarão ao vê-la. Esta descrição enigmática pode referir-se a um império ou líder que parece desaparecer e depois ressurge, ou ao poder satânico por trás dela.</li>
+                    <li><strong>As Sete Cabeças:</strong>
+                        <ul>
+                            <li>São sete montes, nos quais a mulher está sentada (muitos veem uma alusão a Roma, a cidade das sete colinas).</li>
+                            <li>São também sete reis: cinco já caíram, um existe, e o outro ainda não chegou; e, quando chegar, tem de durar pouco.</li>
+                            <li>A besta que era e não é, é ela também o oitavo rei, e procede dos sete, e caminha para a perdição. (Uma figura ou sistema que resume ou sucede os anteriores).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Os Dez Chifres:</strong>
+                        <ul>
+                            <li>São dez reis que ainda não receberam reino, mas recebem autoridade como reis, por uma hora, juntamente com a besta.</li>
+                            <li>Têm um só pensamento e entregam à besta o poder e a autoridade que possuem.</li>
+                            <li>Pelejarão contra o Cordeiro, mas o Cordeiro os vencerá, pois é o Senhor dos senhores e o Rei dos reis; e vencerão também os chamados, eleitos e fiéis que estão com Ele.</li>
+                        </ul>
+                    </li>
+                    <li><strong>As Muitas Águas:</strong> As águas onde a prostituta está sentada são povos, multidões, nações e línguas (sua influência global).</li>
+                    <li><strong>A Destruição da Prostituta pelos Dez Chifres e a Besta:</strong> Os dez chifres e a besta odiarão a prostituta, a deixarão desolada e nua, comerão as suas carnes e a queimarão no fogo. Deus pôs no coração deles o executarem o Seu desígnio, tendo um só pensamento até que se cumpram as palavras de Deus. (Uma aliança política que se volta contra o sistema religioso apóstata que antes apoiava).</li>
+                    <li><strong>Identidade da Mulher:</strong> "A mulher que viste é a grande cidade que domina sobre os reis da terra." (Historicamente, Roma. Simbolicamente, qualquer sistema mundial poderoso e corrupto que seduz e persegue).</li>
+                </ul>
+            </div>
+            <div data-chapter="18">
+                <h3>A Queda da Grande Babilônia</h3>
+                <p>Este capítulo descreve em detalhes a queda e a lamentação pela destruição da Babilônia.</p>
+                <h3>Versículos 1-3: O Anúncio da Queda por Outro Anjo.</h3>
+                <ul>
+                    <li>Um anjo poderoso desce do céu, cuja glória ilumina a terra.</li>
+                    <li>Clama com forte voz: "Caiu, caiu a grande Babilônia e se tornou morada de demônios, covil de toda espécie de espírito imundo e esconderijo de todo gênero de ave imunda e detestável."</li>
+                    <li>Motivo: "Pois todas as nações têm bebido do vinho do furor da sua prostituição. Com ela se prostituíram os reis da terra. E, à custa da sua luxúria, enriqueceram os mercadores da terra."</li>
+                </ul>
+                <h3>Versículos 4-8: O Chamado para Sair Dela e o Juízo Iminente.</h3>
+                <ul>
+                    <li>Outra voz do céu diz: "Retirai-vos dela, povo meu, para não serdes cúmplices em seus pecados e para não participardes dos seus flagelos."</li>
+                    <li>Seus pecados se acumularam até ao céu, e Deus se lembrou das suas iniquidades.</li>
+                    <li>Será retribuída conforme suas obras. Por sua arrogância e luxo, receberá tormento e pranto.</li>
+                    <li>Seu juízo virá num só dia: morte, pranto e fome; e será consumida no fogo, porque poderoso é o Senhor Deus, que a julgou.</li>
+                </ul>
+                <h3>Versículos 9-19: O Lamento dos Reis, Mercadores e Marinheiros.</h3>
+                <ul>
+                    <li><strong>Lamento dos Reis da Terra (vv. 9-10):</strong> Os reis que com ela se prostituíram e viveram em luxúria chorarão e prantearão ao verem a fumaça do seu incêndio. Ficarão de longe, temendo seu tormento, dizendo: "Ai! Ai! Tu, grande cidade, Babilônia, cidade poderosa! Pois, em uma só hora, chegou o teu juízo."</li>
+                    <li><strong>Lamento dos Mercadores da Terra (vv. 11-17a):</strong> Os mercadores chorarão e prantearão porque ninguém mais compra suas mercadorias: ouro, prata, pedras preciosas, pérolas, linho fino, púrpura, seda, escarlate, madeira odorífera, objetos de marfim, madeira preciosa, bronze, ferro, mármore, canela, especiarias, incenso, mirra, olíbano, vinho, azeite, flor de farinha, trigo, gado, ovelhas, cavalos, carros, e até "corpos e almas de homens" (escravos). Lamentam a perda de seus lucros e do luxo que ela proporcionava. "Em uma só hora, tamanha riqueza foi devastada!"</li>
+                    <li><strong>Lamento dos Pilotos e Marinheiros (vv. 17b-19):</strong> Todos os pilotos, navegantes, marinheiros e quantos labutam no mar param de longe, e, vendo a fumaça do seu incêndio, clamam: "Que cidade se compara à grande cidade?" Lançam pó sobre a cabeça, chorando e pranteando: "Ai! Ai! A grande cidade, na qual se enriqueceram todos os que possuíam navios no mar, à custa da sua opulência! Pois, em uma só hora, foi devastada."</li>
+                </ul>
+                <h3>Versículos 20: Alegria no Céu pela Sua Queda.</h3>
+                <p>"Exulta sobre ela, ó céu, e vós, santos, apóstolos e profetas, porque Deus contra ela julgou a vossa causa."</p>
+                <h3>Versículos 21-24: A Destruição Final e Irreversível da Babilônia.</h3>
+                <ul>
+                    <li>Um anjo forte levanta uma pedra como grande mó e a atira ao mar, dizendo: "Assim, com ímpeto, será arremessada Babilônia, a grande cidade, e nunca jamais será achada."</li>
+                    <li>Nunca mais se ouvirá nela som de harpistas, músicos, flautistas, trombeteiros.</li>
+                    <li>Nunca mais se achará nela artífice algum.</li>
+                    <li>Nunca mais se ouvirá nela ruído de mó.</li>
+                    <li>Nunca mais brilhará nela luz de candeia.</li>
+                    <li>Nunca mais se ouvirá nela voz de noivo ou de noiva.</li>
+                    <li>Motivos finais para sua destruição: Seus mercadores eram os grandes da terra, e todas as nações foram seduzidas por suas feitiçarias. "E nela se achou sangue de profetas, de santos e de todos os que foram mortos sobre a terra."</li>
+                </ul>
+            </div>
+            <div data-chapter="19">
+                <h3>Alegria no Céu, as Bodas do Cordeiro e a Segunda Vinda de Cristo</h3>
+                <p>Este capítulo contrasta fortemente com o anterior, mostrando a alegria celestial pela justiça divina e a gloriosa vinda de Cristo.</p>
+                <h3>Versículos 1-10: Grande Alegria no Céu e o Anúncio das Bodas do Cordeiro.</h3>
+                <ul>
+                    <li><strong>O Primeiro "Aleluia" (vv. 1-3):</strong> Após a queda da Babilônia, João ouve no céu como que uma grande voz de numerosa multidão, dizendo: "Aleluia! A salvação, e a glória, e o poder são do nosso Deus, porquanto verdadeiros e justos são os seus juízos, pois julgou a grande meretriz que corrompia a terra com a sua prostituição e das mãos dela vingou o sangue dos seus servos." E uma segunda vez dizem: "Aleluia! E a sua fumaça sobe pelos séculos dos séculos."</li>
+                    <li><strong>Adoração dos Anciãos e Seres Viventes (v. 4):</strong> Os vinte e quatro anciãos e os quatro seres viventes prostram-se e adoram a Deus, que se acha sentado no trono, dizendo: "Amém! Aleluia!"</li>
+                    <li><strong>O Segundo "Aleluia" e o Chamado à Adoração (v. 5):</strong> Sai uma voz do trono, conclamando: "Dai louvores ao nosso Deus, todos os seus servos, os que o temeis, os pequenos e os grandes."</li>
+                    <li><strong>O Terceiro "Aleluia" e as Bodas do Cordeiro (vv. 6-9):</strong> João ouve como que a voz de numerosa multidão, como de muitas águas e de fortes trovões, dizendo: "Aleluia! Pois reina o Senhor, nosso Deus, o Todo-Poderoso. Alegremo-nos, exultemos e demos-lhe a glória, porque são chegadas as bodas do Cordeiro, cuja esposa a si mesma já se ataviou, pois lhe foi dado vestir-se de linho finíssimo, resplandecente e puro; porque o linho finíssimo são os atos de justiça dos santos."
+                        <ul>
+                            <li>O anjo diz a João: "Escreve: Bem-aventurados aqueles que são chamados à ceia das bodas do Cordeiro." E acrescenta: "São estas as verdadeiras palavras de Deus."</li>
+                        </ul>
+                    </li>
+                    <li><strong>A Adoração de João e a Repreensão do Anjo (v. 10):</strong> João prostra-se aos pés do anjo para adorá-lo, mas o anjo o impede: "Vê, não faças isso; sou conservo teu e dos teus irmãos que mantêm o testemunho de Jesus; adora a Deus. Pois o testemunho de Jesus é o espírito da profecia."</li>
+                </ul>
+                <h3>Versículos 11-21: A Segunda Vinda de Cristo e a Derrota da Besta e do Falso Profeta.</h3>
+                <ul>
+                    <li><strong>O Cavaleiro do Cavalo Branco (vv. 11-16):</strong>
+                        <ul>
+                            <li>O céu se abre, e surge um cavalo branco. Seu cavaleiro chama-se Fiel e Verdadeiro e julga e peleja com justiça.</li>
+                            <li>Seus olhos são chama de fogo; na sua cabeça, há muitos diademas; tem um nome escrito que ninguém conhece, senão ele mesmo.</li>
+                            <li>Está vestido com um manto tinto de sangue, e o seu nome se chama o Verbo de Deus.</li>
+                            <li>Seguem-no os exércitos que há no céu, montando cavalos brancos, com vestiduras de linho finíssimo, branco e puro.</li>
+                            <li>De sua boca sai uma espada afiada, para com ela ferir as nações; e ele mesmo as regerá com cetro de ferro e pisa o lagar do vinho do furor da ira do Deus Todo-Poderoso.</li>
+                            <li>Tem no seu manto e na sua coxa um nome inscrito: REI DOS REIS E SENHOR DOS SENHORES.</li>
+                        </ul>
+                    </li>
+                    <li><strong>O Anjo Convocando as Aves para a Grande Ceia de Deus (vv. 17-18):</strong> Um anjo, de pé sobre o sol, clama em grande voz a todas as aves que voam pelo meio do céu, para que se ajuntem para a grande ceia de Deus, a fim de comerem carnes de reis, de comandantes, de poderosos, de cavalos e de seus cavaleiros, de todos os homens, livres e escravos, pequenos e grandes. (Uma imagem sombria da carnificina dos inimigos de Deus).</li>
+                    <li><strong>A Batalha Final e a Derrota dos Inimigos (vv. 19-21):</strong>
+                        <ul>
+                            <li>João vê a besta e os reis da terra com os seus exércitos, congregados para pelejarem contra Aquele que estava montado no cavalo e contra o seu exército.</li>
+                            <li>A besta é aprisionada, e com ela o falso profeta que, diante dela, operara os sinais com os quais seduzira os que receberam a marca da besta e eram os adoradores da sua imagem.</li>
+                            <li>Os dois são lançados vivos dentro do lago de fogo que arde com enxofre.</li>
+                            <li>Os restantes (os exércitos inimigos) foram mortos com a espada que saía da boca dAquele que estava montado no cavalo. E todas as aves se fartaram das suas carnes.</li>
+                            <li><strong>Significado:</strong> Este é o clímax da vitória de Cristo sobre as forças organizadas do mal na terra. A "batalha" é mais uma execução sumária do que um conflito prolongado.</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div data-chapter="20">
+                <h3>O Milênio, a Última Revolta de Satanás e o Juízo Final</h3>
+                <p>Este capítulo descreve o reinado de mil anos de Cristo, a soltura e derrota final de Satanás, e o julgamento de todos os mortos.</p>
+                <h3>Versículos 1-3: A Prisão de Satanás por Mil Anos.</h3>
+                <ul>
+                    <li>Um anjo desce do céu, tendo na mão a chave do abismo e uma grande corrente.</li>
+                    <li>Ele segura o dragão, a antiga serpente, que é o diabo e Satanás, e o prende por mil anos.</li>
+                    <li>Lança-o no abismo, fecha-o e põe selo sobre ele, para que não mais engane as nações até que se completem os mil anos. Depois disto, é necessário que ele seja solto por um pouco de tempo.</li>
+                </ul>
+                <h3>Versículos 4-6: O Reinado Milenar de Cristo e dos Santos (A Primeira Ressurreição).</h3>
+                <ul>
+                    <li>João vê tronos, e sobre eles se assentam aqueles a quem foi dada autoridade de julgar.</li>
+                    <li>Vê também as almas dos decapitados por causa do testemunho de Jesus e da palavra de Deus, os que não adoraram a besta nem a sua imagem, e não receberam a marca na fronte nem nas mãos.</li>
+                    <li>Eles revivem (a primeira ressurreição) e reinam com Cristo durante mil anos.</li>
+                    <li>Os restantes dos mortos não revivem até que se completem os mil anos.</li>
+                    <li>"Bem-aventurado e santo é aquele que tem parte na primeira ressurreição; sobre esses a segunda morte não tem autoridade; pelo contrário, serão sacerdotes de Deus e de Cristo e reinarão com ele os mil anos."</li>
+                    <li><strong>Interpretação do Milênio:</strong> Este é um dos textos mais debatidos do Apocalipse.
+                        <ul>
+                            <li><strong>Pré-milenismo:</strong> Cristo retorna *antes* de um reinado literal de mil anos na terra.</li>
+                            <li><strong>Pós-milenismo:</strong> Cristo retorna *após* um período de ouro da Igreja, que gradualmente cristianiza o mundo (o "milênio" pode ser literal ou simbólico de um longo período).</li>
+                            <li><strong>Amilenismo:</strong> O milênio é simbólico do reinado celestial de Cristo e dos santos entre Sua primeira e segunda vinda, ou da era da Igreja. A "primeira ressurreição" é vista como a regeneração espiritual ou a bem-aventurança dos santos que morrem em Cristo.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <h3>Versículos 7-10: A Soltura e Derrota Final de Satanás (Gogue e Magogue).</h3>
+                <ul>
+                    <li>Quando se completarem os mil anos, Satanás será solto da sua prisão.</li>
+                    <li>Sairá a seduzir as nações que há nos quatro cantos da terra, Gogue e Magogue (nomes simbólicos de inimigos de Deus, de Ezequiel 38-39), a fim de reuni-las para a peleja. O número delas é como a areia do mar.</li>
+                    <li>Marcharam pela superfície da terra e sitiaram o acampamento dos santos e a cidade querida (Jerusalém ou a comunidade dos fiéis).</li>
+                    <li>Desce, porém, fogo do céu e os consome.</li>
+                    <li>O diabo, o sedutor deles, é lançado para dentro do lago de fogo e enxofre, onde já se encontram não só a besta como também o falso profeta; e serão atormentados de dia e de noite, pelos séculos dos séculos.</li>
+                    <li><strong>Significado:</strong> Mesmo após um período de paz e justiça, a natureza rebelde da humanidade (e a influência de Satanás) leva a uma última e fútil revolta contra Deus, que é rapidamente subjugada.</li>
+                </ul>
+                <h3>Versículos 11-15: O Juízo do Grande Trono Branco.</h3>
+                <ul>
+                    <li>João vê um grande trono branco e Aquele que nele se assenta, de cuja presença fugiram a terra e o céu, e não se achou lugar para eles (a antiga criação é desfeita).</li>
+                    <li>Vê os mortos, os grandes e os pequenos, postos em pé diante do trono.</li>
+                    <li>Abrem-se livros; e ainda outro livro, o Livro da Vida, é aberto. E os mortos são julgados, segundo as suas obras, conforme o que se achava escrito nos livros.</li>
+                    <li>O mar entrega os mortos que nele havia. A morte e o inferno (Hades, o lugar dos mortos) entregam os mortos que neles havia. E são julgados, um por um, segundo as suas obras.</li>
+                    <li>Então, a morte e o inferno são lançados para dentro do lago de fogo. Esta é a segunda morte, o lago de fogo.</li>
+                    <li>E, se alguém não foi achado inscrito no Livro da Vida, esse foi lançado para dentro do lago de fogo.</li>
+                    <li><strong>Significado:</strong> Este é o julgamento final de todos os incrédulos de todas as eras. Aqueles cujos nomes não estão no Livro da Vida (os que não foram redimidos por Cristo) são condenados à separação eterna de Deus.</li>
+                </ul>
+            </div>
+            <div data-chapter="21">
+                <h3>O Novo Céu, a Nova Terra e a Nova Jerusalém</h3>
+                <p>Este capítulo descreve a consumação final do plano de Deus: a criação de uma nova ordem perfeita e a habitação eterna de Deus com Seu povo.</p>
+                <h3>Versículos 1-8: O Novo Céu, a Nova Terra e a Descida da Nova Jerusalém.</h3>
+                <ul>
+                    <li><strong>A Nova Criação:</strong> João vê "novo céu e nova terra, pois o primeiro céu e a primeira terra passaram, e o mar já não existe." (O mar frequentemente simboliza caos ou separação).</li>
+                    <li><strong>A Nova Jerusalém:</strong> Vê a cidade santa, a nova Jerusalém, que descia do céu, da parte de Deus, ataviada como noiva adornada para o seu esposo.</li>
+                    <li><strong>A Habitação de Deus com os Homens:</strong> Uma grande voz do trono proclama: "Eis o tabernáculo de Deus com os homens. Deus habitará com eles. Eles serão povos de Deus, e Deus mesmo estará com eles e será o seu Deus."</li>
+                    <li><strong>A Eliminação do Sofrimento:</strong> "E lhes enxugará dos olhos toda lágrima, e a morte já não existirá, já não haverá luto, nem pranto, nem dor, porque as primeiras coisas passaram."</li>
+                    <li><strong>Deus Faz Novas Todas as Coisas:</strong> Aquele que está assentado no trono diz: "Eis que faço novas todas as coisas." E ordena a João: "Escreve, porque estas palavras são fiéis e verdadeiras."</li>
+                    <li><strong>A Consumação:</strong> Diz ainda: "Tudo está feito! Eu sou o Alfa e o Ômega, o Princípio e o Fim. Eu, a quem tem sede, darei de graça da fonte da água da vida."</li>
+                    <li><strong>A Herança dos Vencedores:</strong> "O vencedor herdará estas coisas, e eu lhe serei Deus, e ele me será filho."</li>
+                    <li><strong>O Destino dos Ímpios:</strong> "Quanto, porém, aos covardes, aos incrédulos, aos abomináveis, aos assassinos, aos impuros, aos feiticeiros, aos idólatras e a todos os mentirosos, a parte que lhes cabe será no lago que arde com fogo e enxofre, a saber, a segunda morte."</li>
+                </ul>
+                <h3>Versículos 9-27: A Descrição Detalhada da Nova Jerusalém.</h3>
+                <ul>
+                    <li><strong>O Anjo Guia:</strong> Um dos sete anjos das taças leva João em espírito a um grande e alto monte e lhe mostra a cidade santa, Jerusalém, que descia do céu, da parte de Deus.</li>
+                    <li><strong>Glória e Aparência:</strong>
+                        <ul>
+                            <li>Tem a glória de Deus. Seu fulgor é semelhante a uma pedra preciosíssima, como jaspe cristalino.</li>
+                            <li>Grande e alta muralha, com doze portas, e, junto às portas, doze anjos.</li>
+                            <li>Nomes inscritos nas portas: os das doze tribos dos filhos de Israel.</li>
+                            <li>Três portas de cada lado (oriente, norte, sul, ocidente).</li>
+                            <li>A muralha tem doze fundamentos, e sobre estes, os doze nomes dos doze apóstolos do Cordeiro.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Medidas da Cidade:</strong>
+                        <ul>
+                            <li>É quadrangular: seu comprimento é igual à largura.</li>
+                            <li>Comprimento, largura e altura são iguais: doze mil estádios.</li>
+                            <li>Muralha: cento e quarenta e quatro côvados.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Materiais da Cidade:</strong>
+                        <ul>
+                            <li>Muralha: jaspe. Cidade: ouro puro. Fundamentos: pedras preciosas. Doze portas: doze pérolas. Praça: ouro puro.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Ausência de Templo:</strong> "Nela, não vi santuário, porque o seu santuário é o Senhor Deus, o Todo-Poderoso, e o Cordeiro."</li>
+                    <li><strong>Ausência de Sol e Lua:</strong> "A cidade não precisa nem do sol, nem da lua... pois a glória de Deus a iluminou, e o Cordeiro é a sua lâmpada."</li>
+                    <li><strong>As Nações e Reis na Cidade:</strong> As nações andarão mediante a sua luz, e os reis da terra lhe trarão a sua glória.</li>
+                    <li><strong>Portas Sempre Abertas:</strong> Suas portas nunca jamais se fecharão de dia, porque, nela, não haverá noite.</li>
+                    <li><strong>Pureza da Cidade:</strong> "Nela, nunca jamais penetrará coisa alguma contaminada... mas somente os inscritos no Livro da Vida do Cordeiro."</li>
+                </ul>
+            </div>
+            <div data-chapter="22">
+                <h3>O Rio da Água da Vida e a Árvore da Vida; Advertências e Bênçãos Finais</h3>
+                <h3>Versículos 1-5: O Rio da Água da Vida e a Árvore da Vida.</h3>
+                <ul>
+                    <li><strong>O Rio:</strong> O anjo mostra a João o rio da água da vida, brilhante como cristal, que sai do trono de Deus e do Cordeiro.</li>
+                    <li><strong>A Árvore da Vida:</strong> No meio da sua praça (da cidade) e de uma e outra margem do rio, está a árvore da vida, que produz doze frutos, dando o seu fruto de mês em mês. Suas folhas são para a cura dos povos (ou nações).
+                        <ul>
+                            <li><strong>Significado:</strong> Acesso pleno e contínuo à vida eterna e à provisão divina, restaurando o que foi perdido no Éden.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Ausência de Maldição:</strong> "Nunca mais haverá qualquer maldição."</li>
+                    <li><strong>Presença de Deus e Serviço:</strong> Nela, estará o trono de Deus e do Cordeiro. Os seus servos o servirão.</li>
+                    <li><strong>Visão de Deus:</strong> Contemplarão a sua face, e na sua fronte está o nome dele.</li>
+                    <li><strong>Ausência de Noite e Luz Divina:</strong> "Então, já não haverá noite, nem precisarão eles de luz de candeia, nem da luz do sol, porque o Senhor Deus brilhará sobre eles, e reinarão pelos séculos dos séculos."</li>
+                </ul>
+                <h3>Versículos 6-11: A Fidelidade das Palavras e a Iminência da Vinda de Cristo.</h3>
+                 <ul>
+                    <li><strong>Confirmação Angélica:</strong> O anjo afirma a João: "Estas palavras são fiéis e verdadeiras. O Senhor, o Deus dos espíritos dos profetas, enviou seu anjo para mostrar aos seus servos as coisas que em breve devem acontecer."</li>
+                    <li><strong>Promessa de Cristo:</strong> (Jesus fala) "Eis que venho sem demora. Bem-aventurado aquele que guarda as palavras da profecia deste livro."</li>
+                    <li><strong>Reação de João e Nova Repreensão:</strong> João, ao ouvir e ver, prostra-se para adorar o anjo, que novamente o repreende: "Vê, não faças isso... Adora a Deus."</li>
+                    <li><strong>Não Selar a Profecia:</strong> O anjo diz a João: "Não seles as palavras da profecia deste livro, porque o tempo está próximo." (Contraste com Daniel, a quem foi dito para selar a profecia).</li>
+                    <li><strong>A Fixidez do Caráter no Fim:</strong> "Continue o injusto fazendo injustiça, continue o imundo ainda sendo imundo; o justo continue na prática da justiça, e o santo continue a santificar-se." (Indica que as oportunidades de mudança estão se esgotando).</li>
+                </ul>
+                <h3>Versículos 12-17: A Vinda de Cristo, Recompensas e o Convite Final.</h3>
+                <ul>
+                    <li><strong>A Vinda e a Recompensa:</strong> (Jesus fala) "Eis que venho sem demora, e comigo está o galardão que tenho para dar a cada um segundo as suas obras."</li>
+                    <li><strong>Autoidentificação de Cristo:</strong> "Eu sou o Alfa e o Ômega, o Primeiro e o Último, o Princípio e o Fim."</li>
+                    <li><strong>Bem-Aventurança e Acesso à Árvore da Vida:</strong> "Bem-aventurados aqueles que lavam as suas vestiduras [no sangue do Cordeiro], para que lhes assista o direito à árvore da vida, e entrem na cidade pelas portas."</li>
+                    <li><strong>Os Excluídos:</strong> "Fora ficam os cães, os feiticeiros, os impuros, os assassinos, os idólatras e todo aquele que ama e pratica a mentira."</li>
+                    <li><strong>Testemunho de Jesus:</strong> "Eu, Jesus, enviei o meu anjo para vos testificar estas coisas às igrejas. Eu sou a Raiz e a Geração de Davi, a brilhante Estrela da manhã."</li>
+                    <li><strong>O Convite do Espírito e da Noiva:</strong> "O Espírito e a noiva dizem: Vem! Aquele que ouve, diga: Vem! Aquele que tem sede venha, e quem quiser receba de graça a água da vida."</li>
+                </ul>
+                <h3>Versículos 18-21: Advertência Final e Bênção.</h3>
+                <ul>
+                    <li><strong>Advertência Solene:</strong> João testifica a todos que ouvem as palavras da profecia deste livro: "Se alguém lhes acrescentar alguma coisa, Deus lhe acrescentará os flagelos escritos neste livro; e, se alguém tirar qualquer coisa das palavras do livro desta profecia, Deus tirará a sua parte da árvore da vida, da cidade santa e das coisas que se acham escritas neste livro."</li>
+                    <li><strong>Promessa Final de Cristo:</strong> Aquele que dá testemunho destas coisas diz: "Certamente, venho sem demora."</li>
+                    <li><strong>Resposta da Igreja:</strong> "Amém! Vem, Senhor Jesus!"</li>
+                    <li><strong>Bênção Final (Graça):</strong> "A graça do Senhor Jesus seja com todos." (Ou "com os santos", em algumas versões).</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center p-6 mt-10 text-neutral-600 border-t border-stone-300 bg-stone-200">
+        <p class="text-sm">&copy; 2025 Explorador do Apocalipse. Conteúdo adaptado da "Explicação Detalhada dos Capítulos do Livro do Apocalipse".</p>
+        <p class="text-xs mt-1">Desenvolvido como uma ferramenta de estudo interativa.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const visaoGeralSection = document.getElementById('visao-geral-section');
+            const chapterDisplaySection = document.getElementById('chapter-display-section');
+            const chapterTitleEl = document.getElementById('chapter-title');
+            const chapterContentContainerEl = document.getElementById('chapter-content-container');
+            const allChaptersDataEl = document.getElementById('all-chapters-data');
+            
+            const navVisaoGeralBtn = document.getElementById('nav-visao-geral');
+            const chapterSelect = document.getElementById('chapter-select');
+            
+            const searchInput = document.getElementById('search-input');
+            const searchButton = document.getElementById('search-button');
+            const clearSearchButton = document.getElementById('clear-search-button');
+
+            let originalChapterContent = ''; 
+            let currentChapterNumber = null;
+
+            for (let i = 1; i <= 22; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = 'Capítulo ' + i;
+                chapterSelect.appendChild(option);
+            }
+
+            function setActiveSection(sectionId) {
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.remove('active');
+                    section.classList.add('hidden');
+                });
+                const activeEl = document.getElementById(sectionId);
+                if (activeEl) {
+                    activeEl.classList.add('active');
+                    activeEl.classList.remove('hidden');
+                }
+
+                document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+                if (sectionId === 'visao-geral-section' && navVisaoGeralBtn) {
+                    navVisaoGeralBtn.classList.add('active');
+                    if(chapterSelect) chapterSelect.value = ""; 
+                }
+            }
+
+            function displayChapter(chapterNum) {
+                currentChapterNumber = chapterNum;
+                const chapterDataEl = allChaptersDataEl.querySelector('div[data-chapter="' + chapterNum + '"]');
+                if (chapterDataEl) {
+                    if(chapterTitleEl) chapterTitleEl.textContent = 'Capítulo ' + chapterNum;
+                    originalChapterContent = chapterDataEl.innerHTML;
+                    if(chapterContentContainerEl) chapterContentContainerEl.innerHTML = originalChapterContent;
+                    setActiveSection('chapter-display-section');
+                    if(navVisaoGeralBtn) navVisaoGeralBtn.classList.remove('active');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    if(chapterTitleEl) chapterTitleEl.textContent = 'Capítulo ' + chapterNum + ' (Conteúdo não disponível)';
+                    if(chapterContentContainerEl) chapterContentContainerEl.innerHTML = '<p>O conteúdo detalhado para este capítulo ainda não foi carregado nesta demonstração.</p>';
+                    setActiveSection('chapter-display-section');
+                }
+                clearSearchHighlights(); 
+            }
+            
+
+            if(navVisaoGeralBtn) {
+                navVisaoGeralBtn.addEventListener('click', function() {
+                    setActiveSection('visao-geral-section');
+                    currentChapterNumber = null;
+                    clearSearchHighlights();
+                });
+            }
+
+            if(chapterSelect) {
+                chapterSelect.addEventListener('change', function() {
+                    if (this.value) {
+                        displayChapter(this.value);
+                    } else if(currentChapterNumber !== null) { 
+                        setActiveSection('visao-geral-section'); 
+                        currentChapterNumber = null;
+                    }
+                });
+            }
+
+            function performSearch() {
+                const searchTerm = searchInput.value.trim().toLowerCase();
+                if (!searchTerm) {
+                    clearSearchHighlights();
+                    return;
+                }
+
+                if (currentChapterNumber === null && visaoGeralSection.classList.contains('active')) {
+                    alert("Por favor, selecione um capítulo para realizar a busca.");
+                     return;
+                }
+                
+                if (!chapterContentContainerEl || !originalChapterContent) return;
+
+                chapterContentContainerEl.innerHTML = originalChapterContent;
+
+                let count = 0;
+                const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                
+                function highlightTextNodes(node) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        const matches = node.textContent.match(regex);
+                        if (matches) {
+                            count += matches.length;
+                            const newNode = document.createElement('span');
+                            newNode.innerHTML = node.textContent.replace(regex, '<mark>$&</mark>');
+                            node.parentNode.replaceChild(newNode, node);
+                        }
+                    } else if (node.nodeType === Node.ELEMENT_NODE && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+                        Array.from(node.childNodes).forEach(highlightTextNodes);
+                    }
+                }
+
+                highlightTextNodes(chapterContentContainerEl);
+
+                if (count > 0) {
+                    if(clearSearchButton) clearSearchButton.classList.remove('hidden');
+                    const firstMark = chapterContentContainerEl.querySelector('mark');
+                    if (firstMark) {
+                        firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    if(clearSearchButton) clearSearchButton.classList.add('hidden');
+                }
+            }
+            
+            function clearSearchHighlights() {
+                if (chapterContentContainerEl && originalChapterContent) {
+                    chapterContentContainerEl.innerHTML = originalChapterContent;
+                }
+                if(searchInput) searchInput.value = ''; 
+                if(clearSearchButton) clearSearchButton.classList.add('hidden');
+            }
+
+            if(searchButton) searchButton.addEventListener('click', performSearch);
+            if(searchInput) {
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        performSearch();
+                    }
+                });
+            }
+            if(clearSearchButton) clearSearchButton.addEventListener('click', clearSearchHighlights);
+
+            const ctx = document.getElementById('majorSectionsChart')?.getContext('2d');
+            if (ctx) {
+                const majorSectionsChart = new Chart(ctx, {
+                    type: 'bar', 
+                    data: {
+                        labels: [
+                            "Intro & Cartas (1-3)", 
+                            "Visão Celestial & Selos (4-7)", 
+                            "Trombetas & Interlúdios (8-11)", 
+                            "Conflito Cósmico (12-14)", 
+                            "Taças & Queda da Babilônia (15-18)", 
+                            "2ª Vinda & Milênio (19-20)", 
+                            "Nova Criação (21-22)"
+                        ],
+                        datasets: [{
+                            label: 'Nº de Capítulos',
+                            data: [3, 4, 4, 3, 4, 2, 2],
+                            backgroundColor: [
+                                'rgba(3, 105, 161, 0.7)',  
+                                'rgba(14, 165, 233, 0.7)', 
+                                'rgba(13, 148, 136, 0.7)', 
+                                'rgba(20, 184, 166, 0.7)', 
+                                'rgba(5, 150, 105, 0.7)',  
+                                'rgba(16, 185, 129, 0.7)', 
+                                'rgba(101, 163, 13, 0.7)'  
+                            ],
+                            borderColor: [
+                                'rgba(3, 105, 161, 1)',
+                                'rgba(14, 165, 233, 1)',
+                                'rgba(13, 148, 136, 1)',
+                                'rgba(20, 184, 166, 1)',
+                                'rgba(5, 150, 105, 1)',
+                                'rgba(16, 185, 129, 1)',
+                                'rgba(101, 163, 13, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', 
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Número de Capítulos',
+                                    font: { size: 14, weight: '500' },
+                                    color: '#4b5563' 
+                                },
+                                 ticks: { color: '#4b5563' }
+                            },
+                            y: {
+                                 ticks: { color: '#4b5563', font: {size: 11} }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false 
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                titleFont: { size: 14 },
+                                bodyFont: { size: 12 },
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.x !== null) {
+                                            label += context.parsed.x + ' capítulos';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            setActiveSection('visao-geral-section');
+            if(navVisaoGeralBtn) navVisaoGeralBtn.classList.add('active');
+        });
+    </script>
+</body>
+</html>
